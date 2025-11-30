@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador RISC-V Monociclo</title>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/animations.css">
+
+  <!-- Fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+
+  <div class="app-container">
+
+    <!-- HEADER -->
+    <header class="main-header">
+      <h1>RISC-V Simulator</h1>
+      <div class="status-bar">
+        <span class="status-item">PC: <code id="ui-pc">0x00000000</code></span>
+        <span class="status-item">Cycle: <code id="ui-cycle">0</code></span>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT (GRID) -->
+    <main class="main-layout">
+
+      <!-- IZQUIERDA: DATAPATH (SVG) -->
+      <section class="datapath-section">
+        <div class="datapath-container" id="datapath-container">
+          <div class="bg-panel">
+            <div class="placeholder-msg">
+              <p>Aquí se cargará el Datapath SVG</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leyenda de Etapas -->
+        <div class="stages-indicator">
+          <div class="stage-pill" id="stage-fetch">FETCH</div>
+          <div class="stage-pill" id="stage-decode">DECODE</div>
+          <div class="stage-pill" id="stage-exec">EXEC</div>
+          <div class="stage-pill" id="stage-mem">MEM</div>
+          <div class="stage-pill" id="stage-wb">WB</div>
+        </div>
+      </section>
+
+      <!-- DERECHA: CONTROLES Y ESTADO -->
+      <aside class="controls-section">
+
+        <!-- Panel de Control -->
+        <div class="panel control-panel">
+          <h2>Controls</h2>
+          <div class="button-group">
+            <button id="btn-step" class="btn primary">
+              <span>Step</span>
+            </button>
+            <button id="btn-run" class="btn secondary">
+              <span>Run</span>
+            </button>
+            <button id="btn-reset" class="btn danger">
+              <span>Reset</span>
+            </button>
+          </div>
+          <div class="input-group">
+            <label for="program-input">Cargar Programa (Hex):</label>
+            <textarea id="program-input" placeholder="00000013&#10;00100093..."></textarea>
+            <button id="btn-load" class="btn-small">
+              <span>Cargar</span>
+            </button>
+          </div>
+        </div>
+
+
+        <div class="panel decode-panel">
+          <h2>Instrucción Actual</h2>
+          <div class="decode-grid">
+            <div class="decode-item">
+              <span class="label">Opcode</span>
+              <code id="info-opcode">--</code>
+            </div>
+            <div class="decode-item">
+              <span class="label">Funct3</span>
+              <code id="info-funct3">--</code>
+            </div>
+            <div class="decode-item">
+              <span class="label">Funct7</span>
+              <code id="info-funct7">--</code>
+            </div>
+            <div class="decode-item">
+              <span class="label">Imm</span>
+              <code id="info-imm">--</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Banco de Registros -->
+        <div class="panel registers-panel">
+          <h2>Registros (x0-x31)</h2>
+          <div class="table-container">
+            <table id="registers-table">
+              <thead>
+                <tr>
+                  <th>Reg</th>
+                  <th>Alias</th>
+                  <th>Valor (Hex)</th>
+                  <th>Valor (Dec)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Se llenará con JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </aside>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
