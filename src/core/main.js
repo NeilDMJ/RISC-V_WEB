@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-run').addEventListener('click', handleRun);
     document.getElementById('btn-reset').addEventListener('click', handleReset);
     document.getElementById('btn-load').addEventListener('click', handleLoad);
+    document.getElementById('btn-fullscreen').addEventListener('click', handleFullscreen);
 
     // Load default program
     const defaultProgram = document.getElementById('program-input').placeholder;
@@ -80,6 +81,46 @@ function handleLoad() {
     updateUI();
     alert("Programa cargado exitosamente.");
 }
+
+function handleFullscreen() {
+    const section = document.getElementById('datapath-section');
+    
+    if (!document.fullscreenElement) {
+        // Entrar en pantalla completa
+        section.classList.add('fullscreen');
+        if (section.requestFullscreen) {
+            section.requestFullscreen();
+        } else if (section.webkitRequestFullscreen) { // Safari
+            section.webkitRequestFullscreen();
+        } else if (section.msRequestFullscreen) { // IE11
+            section.msRequestFullscreen();
+        }
+    } else {
+        // Salir de pantalla completa
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) { // Safari
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) { // IE11
+            document.msExitFullscreen();
+        }
+    }
+}
+
+// Escuchar cambios en el estado de pantalla completa
+document.addEventListener('fullscreenchange', () => {
+    const section = document.getElementById('datapath-section');
+    if (!document.fullscreenElement) {
+        section.classList.remove('fullscreen');
+    }
+});
+
+document.addEventListener('webkitfullscreenchange', () => {
+    const section = document.getElementById('datapath-section');
+    if (!document.webkitFullscreenElement) {
+        section.classList.remove('fullscreen');
+    }
+});
 
 function updateStageIndicator(stage) {
     // Remove active class from all

@@ -85,6 +85,55 @@ body {
     position: relative;
 }
 
+.btn-fullscreen {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 100;
+    background-color: rgba(30, 41, 59, 0.8);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.btn-fullscreen:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    transform: scale(1.05);
+}
+
+.btn-fullscreen:active {
+    transform: scale(0.95);
+}
+
+.datapath-section.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    padding: 2rem;
+}
+
+.datapath-section.fullscreen .datapath-container {
+    width: 100%;
+    height: calc(100% - 5rem);
+}
+
+.datapath-section.fullscreen .btn-fullscreen svg {
+    transform: rotate(180deg);
+}
+
 .datapath-container {
     flex: 1;
     width: 1200px;
