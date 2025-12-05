@@ -24,10 +24,23 @@
 
     <!-- HEADER -->
     <header class="main-header">
-      <h1>RISC-V Simulator</h1>
+      <div class="header-left">
+        <div class="logo-badge">RV32I</div>
+        <h1>RISC-V <span>Simulator</span></h1>
+      </div>
       <div class="status-bar">
-        <span class="status-item">PC: <code id="ui-pc">0x00000000</code></span>
-        <span class="status-item">Cycle: <code id="ui-cycle">0</code></span>
+        <div class="status-chip">
+          <span class="status-label">PC</span>
+          <code id="ui-pc">0x00000000</code>
+        </div>
+        <div class="status-chip">
+          <span class="status-label">Ciclo</span>
+          <code id="ui-cycle">0</code>
+        </div>
+        <div class="status-chip status-instruction">
+          <span class="status-label">Instrucción</span>
+          <code id="ui-asm">--</code>
+        </div>
       </div>
     </header>
 
@@ -36,33 +49,69 @@
 
       <!-- IZQUIERDA: DATAPATH (SVG) -->
       <section class="datapath-section" id="datapath-section">
-        <button id="btn-fullscreen" class="btn-fullscreen" title="Pantalla completa">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-          </svg>
-        </button>
+        <div class="datapath-toolbar">
+          <button id="btn-fullscreen" class="btn-icon" title="Pantalla completa">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+          </button>
+          <button id="btn-toggle-sidebar" class="btn-icon" title="Toggle Panel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M15 3v18"/>
+            </svg>
+          </button>
+        </div>
+        
         <div class="datapath-container" id="datapath-container">
-          <div class="bg-panel">
-          </div>
+          <div class="bg-panel"></div>
           <p>Aquí se cargará el Datapath SVG</p>
         </div>
 
         <!-- Leyenda de Etapas -->
         <div class="stages-indicator">
-          <div class="stage-pill" id="stage-fetch">FETCH</div>
-          <div class="stage-pill" id="stage-decode">DECODE</div>
-          <div class="stage-pill" id="stage-exec">EXEC</div>
-          <div class="stage-pill" id="stage-mem">MEM</div>
-          <div class="stage-pill" id="stage-wb">WB</div>
+          <div class="stage-pill" id="stage-fetch">
+            <span class="stage-num">1</span>
+            <span class="stage-name">FETCH</span>
+          </div>
+          <div class="stage-connector"></div>
+          <div class="stage-pill" id="stage-decode">
+            <span class="stage-num">2</span>
+            <span class="stage-name">DECODE</span>
+          </div>
+          <div class="stage-connector"></div>
+          <div class="stage-pill" id="stage-exec">
+            <span class="stage-num">3</span>
+            <span class="stage-name">EXECUTE</span>
+          </div>
+          <div class="stage-connector"></div>
+          <div class="stage-pill" id="stage-mem">
+            <span class="stage-num">4</span>
+            <span class="stage-name">MEMORY</span>
+          </div>
+          <div class="stage-connector"></div>
+          <div class="stage-pill" id="stage-wb">
+            <span class="stage-num">5</span>
+            <span class="stage-name">WRITEBACK</span>
+          </div>
         </div>
       </section>
 
       <!-- DERECHA: CONTROLES Y ESTADO -->
-      <aside class="controls-section">
+      <aside class="controls-section" id="controls-section">
+        
 
         <!-- Panel de Control -->
         <div class="panel control-panel">
-          <h2>Controls</h2>
+          <div class="panel-header">
+            <h2>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v4m0 14v4m-9-9h4m14 0h4"/>
+              </svg>
+              Controles
+            </h2>
+          </div>
           <div class="button-group">
             <button id="btn-step" class="btn primary">
               <span>Step</span>
@@ -74,61 +123,143 @@
               <span>Reset</span>
             </button>
           </div>
+
+          <!-- Control de Velocidad -->
+          <div class="speed-control">
+            <div class="speed-header">
+              <label for="speed-slider">Velocidad de ejecución</label>
+              <span class="speed-value" id="speed-value">600ms</span>
+            </div>
+            <input 
+              type="range" 
+              id="speed-slider" 
+              class="speed-slider" 
+              min="50" 
+              max="2000" 
+              value="600" 
+              step="50"
+            >
+            <div class="speed-labels">
+              <span>Rápido</span>
+              <span>Lento</span>
+            </div>
+          </div>
+
           <div class="input-group">
-            <label for="program-input">Cargar Programa (Hex / ASM):</label>
-            <textarea id="program-input" placeholder="add x3, x4, x6"></textarea>
-            <button id="btn-load" class="btn-small">
-              <span>Cargar</span>
+            <label for="program-input">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              Cargar Programa (Hex / ASM)
+            </label>
+            <textarea id="program-input" placeholder="add x3, x4, x6&#10;sub x5, x3, x2&#10;lw x1, 0(x2)"></textarea>
+            <button id="btn-load" class="btn-load">
+              
+              <span>Cargar Programa</span>
             </button>
           </div>
         </div>
 
-
+        <!-- Panel de Formato de Instrucción RISC-V -->
         <div class="panel decode-panel">
-          <h2>Instrucción Actual</h2>
-          <div class="decode-grid">
-            <div class="decode-item">
-              <span class="label">Opcode</span>
-              <code id="info-opcode">--</code>
+          <div class="panel-header">
+            <h2>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+              Formato de Instrucción
+            </h2>
+            <div class="header-right-controls">
+              <div class="format-toggle-group" id="format-toggle">
+                <button class="format-toggle-btn" data-format="bin" title="Binario">BIN</button>
+                <button class="format-toggle-btn active" data-format="dec" title="Decimal">DEC</button>
+                <button class="format-toggle-btn" data-format="hex" title="Hexadecimal">HEX</button>
+              </div>
+              <span class="instruction-type-badge" id="instruction-type">--</span>
             </div>
-            <div class="decode-item">
-              <span class="label">RD</span>
-              <code id="info-rd">--</code>
-            </div>
-            <div class="decode-item">
-              <span class="label">RS1</span>
-              <code id="info-rs1">--</code>
-            </div>
-            <div class="decode-item">
-              <span class="label">RS2</span>
-              <code id="info-rs2">--</code>
-            </div>
-            <div class="decode-item">
-              <span class="label">Funct3</span>
-              <code id="info-funct3">--</code>
-            </div>
-            <div class="decode-item">
-              <span class="label">Funct7</span>
-              <code id="info-funct7">--</code>
-            </div>
-            <div class="decode-item">
-              <span class="label">Imm</span>
-              <code id="info-imm">--</code>
+          </div>
+          
+          <!-- Tabla de Formato RISC-V estilo imagen -->
+          <div class="instruction-format-table">
+            <table class="format-table" id="format-table">
+              <thead>
+                <tr>
+                  <th>31-25</th>
+                  <th>24-20</th>
+                  <th>19-15</th>
+                  <th>14-12</th>
+                  <th>11-7</th>
+                  <th>6-0</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr id="format-row">
+                  <td class="field-funct7" id="field-funct7">
+                    <span class="field-name">funct7</span>
+                    <code id="val-funct7">--</code>
+                  </td>
+                  <td class="field-rs2" id="field-rs2">
+                    <span class="field-name">rs2</span>
+                    <code id="val-rs2">--</code>
+                  </td>
+                  <td class="field-rs1" id="field-rs1">
+                    <span class="field-name">rs1</span>
+                    <code id="val-rs1">--</code>
+                  </td>
+                  <td class="field-funct3" id="field-funct3">
+                    <span class="field-name">funct3</span>
+                    <code id="val-funct3">--</code>
+                  </td>
+                  <td class="field-rd" id="field-rd">
+                    <span class="field-name">rd</span>
+                    <code id="val-rd">--</code>
+                  </td>
+                  <td class="field-opcode" id="field-opcode">
+                    <span class="field-name">opcode</span>
+                    <code id="val-opcode">--</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Información decodificada -->
+          <div class="decode-details">
+            <div class="decode-info-grid">
+              <div class="decode-detail-item">
+                <span class="detail-label">Inmediato</span>
+                <code id="info-imm">--</code>
+              </div>
+              <div class="decode-detail-item full-width">
+                <span class="detail-label">Instrucción (32 bits)</span>
+                <code id="info-binary" class="binary-code">--------------------------------</code>
+              </div>
             </div>
           </div>
         </div>
 
-
         <!-- Banco de Registros -->
         <div class="panel registers-panel">
-          <h2>Registros (x0-x31)</h2>
+          <div class="panel-header">
+            <h2>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              Banco de Registros
+            </h2>
+            <span class="register-count">x0 - x31</span>
+          </div>
           <div class="table-container">
-            <table id="registers-table">
+            <table id="registers-table" class="registers-table">
               <thead>
                 <tr>
-                  <th>Reg</th>
-                  <th>Valor (Hex)</th>
-                  <th>Valor (Dec)</th>
+                  <th class="col-reg">Registro</th>
+                  <th class="col-alias">ABI</th>
+                  <th class="col-hex">Hexadecimal</th>
+                  <th class="col-dec">Decimal</th>
                 </tr>
               </thead>
               <tbody>

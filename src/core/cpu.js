@@ -303,12 +303,18 @@ export class RISCVProcessor {
     step(onStageUpdate) {
         if (this.state.halted) return null;
 
-        this.state.cycle++;
-
         // FETCH
         if (onStageUpdate) onStageUpdate(Stage.FETCH);
         const index = (this.state.pc >>> 2) & 0xff;
         const instr = this.state.instrMem[index] >>> 0;
+
+        // Detectar fin del programa: instrucción nula o PC fuera de rango
+        if (instr === 0 || index >= 256) {
+            this.state.halted = true;
+            return null;
+        }
+
+        this.state.cycle++;
 
         // DECODE
         if (onStageUpdate) onStageUpdate(Stage.DECODE);
