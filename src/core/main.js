@@ -46,7 +46,38 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Configurar control de velocidad
     setupSpeedControl();
+    
+    // Configurar toggle de vistas de memoria
+    setupMemoryViewToggle();
 });
+
+/* ============================================================
+   MEMORY VIEW TOGGLE
+============================================================ */
+function setupMemoryViewToggle() {
+    const viewBtns = document.querySelectorAll('.view-btn');
+    const gridView = document.getElementById('memory-grid-view');
+    const tableView = document.getElementById('memory-table-view');
+    
+    viewBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            viewBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const view = btn.dataset.view;
+            
+            if (view === 'grid') {
+                gridView.classList.add('active');
+                tableView.classList.remove('active');
+                currentMemoryView = 'grid';
+            } else {
+                gridView.classList.remove('active');
+                tableView.classList.add('active');
+                currentMemoryView = 'table';
+            }
+        });
+    });
+}
 
 /* ============================================================
    SPEED CONTROL
@@ -121,7 +152,17 @@ function toggleSidebar() {
 ============================================================ */
 function handleStep() {
     const result = cpu.step(updateStageIndicator);
-    if (result) updateUI(result);
+    if (result) {
+        // Detectar si la instrucción accede a memoria
+        // LW (Load Word): opcode 0x03
+        // SW (Store Word): opcode 0x23
+        if (result.decoded.opcode === 0x03 || result.decoded.opcode === 0x23) {
+            const addrIndex = (result.alu_res >>> 2) & 0x1f;
+            const operation = result.decoded.opcode === 0x03 ? 'READ' : 'WRITE';
+            updateMemoryStats(addrIndex * 4, operation);
+        }
+        updateUI(result);
+    }
 }
 
 /* ============================================================
@@ -166,8 +207,17 @@ function handleReset() {
     }
 
     lastDecoded = null;
+    memoryAccessCount = 0;
+    lastMemoryAddr = null;
+    lastMemoryOp = '--';
+    
     cpu.reset();
     updateUI();
+    
+    // Resetear estadísticas de memoria
+    document.getElementById('memory-access-count').textContent = '0';
+    document.getElementById('memory-last-addr').textContent = '--';
+    document.getElementById('memory-last-op').textContent = '--';
 
     document.querySelectorAll('.stage-pill').forEach(el => el.classList.remove('active'));
 }
@@ -506,6 +556,7 @@ function updateUI(stepResult) {
     document.getElementById('ui-cycle').textContent = cpu.state.cycle;
 
     renderRegisters();
+    renderMemory();
 
     if (stepResult?.decoded) {
         const d = stepResult.decoded;
@@ -653,5 +704,89 @@ function renderRegisters() {
         });
 
         tbody.appendChild(tr);
+    }
+}
+
+/* ============================================================
+   RENDER MEMORY (AMBAS VISTAS)
+============================================================ */
+let memoryAccessCount = 0;
+let lastMemoryAddr = null;
+let lastMemoryOp = '--';
+let currentMemoryView = 'grid';
+
+function renderMemory() {
+    renderMemoryGrid();
+    renderMemoryTable();
+}
+
+function renderMemoryGrid() {
+    const grid = document.getElementById('memory-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+
+    for (let i = 0; i < 32; i++) {
+        const memAddr = i * 4;
+        const memVal = cpu.state.dataMem[i] >>> 0;
+        const hexVal = memVal.toString(16).toUpperCase().padStart(8, '0');
+        const decVal = memVal.toString();
+
+        const cell = document.createElement('div');
+        cell.className = 'memory-cell' + (lastMemoryAddr === memAddr ? ' active' : '');
+        cell.innerHTML = `
+            <div class="memory-cell-addr">0x${memAddr.toString(16).toUpperCase().padStart(2, '0')}</div>
+            <div class="memory-cell-value">${hexVal}</div>
+            <div class="memory-cell-dec">${decVal > 1000 ? (decVal / 1000).toFixed(1) + 'K' : decVal}</div>
+        `;
+        
+        cell.addEventListener('click', () => {
+            showMemoryDetail(i, memVal);
+        });
+        
+        grid.appendChild(cell);
+    }
+}
+
+function renderMemoryTable() {
+    const tbody = document.querySelector('#memory-table tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+
+    for (let i = 0; i < 32; i++) {
+        const memAddr = i * 4;
+        const memVal = cpu.state.dataMem[i] >>> 0;
+        const hexVal = '0x' + memVal.toString(16).toUpperCase().padStart(8, '0');
+        const decVal = memVal.toString();
+
+        const tr = document.createElement('tr');
+        tr.className = lastMemoryAddr === memAddr ? 'memory-active' : '';
+
+        tr.innerHTML = `
+            <td class="col-addr">0x${memAddr.toString(16).toUpperCase().padStart(2, '0')}</td>
+            <td class="col-offset">[${i}]</td>
+            <td class="col-hex">${hexVal}</td>
+            <td class="col-dec">${decVal}</td>
+        `;
+
+        tbody.appendChild(tr);
+    }
+}
+
+function showMemoryDetail(index, value) {
+    // Aquí se puede agregar un tooltip o modal con más detalles
+    console.log(`Memory[${index}] = 0x${value.toString(16).padStart(8, '0')} (${value})`);
+}
+
+function updateMemoryStats(lastAddr, operation = 'READ') {
+    if (lastAddr !== null && lastAddr !== lastMemoryAddr) {
+        memoryAccessCount++;
+        lastMemoryAddr = lastAddr;
+        lastMemoryOp = operation;
+        
+        document.getElementById('memory-access-count').textContent = memoryAccessCount;
+        document.getElementById('memory-last-addr').textContent = '0x' + lastAddr.toString(16).toUpperCase().padStart(2, '0');
+        document.getElementById('memory-last-op').textContent = operation;
     }
 }
