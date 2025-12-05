@@ -75,8 +75,8 @@
             </button>
           </div>
           <div class="input-group">
-            <label for="program-input">Cargar Programa (Hex):</label>
-            <textarea id="program-input" placeholder="00000013&#10;00100093..."></textarea>
+            <label for="program-input">Cargar Programa (Hex / ASM):</label>
+            <textarea id="program-input" placeholder="add x3, x4, x6"></textarea>
             <button id="btn-load" class="btn-small">
               <span>Cargar</span>
             </button>
@@ -90,6 +90,18 @@
             <div class="decode-item">
               <span class="label">Opcode</span>
               <code id="info-opcode">--</code>
+            </div>
+            <div class="decode-item">
+              <span class="label">RD</span>
+              <code id="info-rd">--</code>
+            </div>
+            <div class="decode-item">
+              <span class="label">RS1</span>
+              <code id="info-rs1">--</code>
+            </div>
+            <div class="decode-item">
+              <span class="label">RS2</span>
+              <code id="info-rs2">--</code>
             </div>
             <div class="decode-item">
               <span class="label">Funct3</span>
@@ -106,6 +118,7 @@
           </div>
         </div>
 
+
         <!-- Banco de Registros -->
         <div class="panel registers-panel">
           <h2>Registros (x0-x31)</h2>
@@ -114,7 +127,6 @@
               <thead>
                 <tr>
                   <th>Reg</th>
-                  <th>Alias</th>
                   <th>Valor (Hex)</th>
                   <th>Valor (Dec)</th>
                 </tr>

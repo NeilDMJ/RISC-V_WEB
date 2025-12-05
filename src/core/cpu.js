@@ -50,22 +50,222 @@ export class RISCVProcessor {
         // No borramos instrMem aquí para persistir el programa cargado
     }
 
-    loadProgram(hexString) {
+
+    loadProgram(sourceCode) {
         this.state.instrMem.fill(0);
-        const lines = hexString
+        const lines = sourceCode
             .split(/\r?\n/)
             .map((l) => l.trim())
             .filter((l) => l && !l.startsWith("#") && !l.startsWith("//"));
 
         let addr = 0;
         for (const line of lines) {
-            const value = parseInt(line, 16);
-            if (!Number.isNaN(value)) {
+            let value = NaN;
+
+            // Si es sólo hexadecimal (p.ej. 00400093)
+            if (/^[0-9a-fA-F]+$/.test(line)) {
+                value = parseInt(line, 16);
+            } else {
+                // Interpretar como instrucción en ensamblador RISC-V
+                value = this.assembleLine(line, addr * 4);
+            }
+
+            if (value != null && !Number.isNaN(value)) {
                 this.state.instrMem[addr++] = value >>> 0;
             }
         }
         this.reset();
         return addr; // Retorna número de instrucciones cargadas
+    }
+
+    assembleLine(line, pc = 0) {
+        // Quitar comentarios
+        const clean = line.split(/[#;]/)[0].trim();
+        if (!clean) return null;
+
+        // Separar por comas y espacios
+        const parts = clean.replace(/,/g, " ").split(/\s+/).filter(Boolean);
+        const mn = parts[0].toLowerCase();
+
+        const reg = (token) => {
+            // Aceptar formato x0-x31
+            const m = token.match(/^x(\d{1,2})$/i);
+            if (!m) throw new Error(`Registro inválido: ${token}`);
+            const n = parseInt(m[1], 10);
+            if (n < 0 || n > 31) throw new Error(`Registro fuera de rango: ${token}`);
+            return n;
+        };
+
+        const immVal = (token) => {
+            if (/^0x[0-9a-fA-F]+$/.test(token)) {
+                return parseInt(token, 16) | 0;
+            }
+            return parseInt(token, 10) | 0;
+        };
+
+        const encodeR = (funct7, rs2, rs1, funct3, rd, opcode) => {
+            return (
+                ((funct7 & 0x7f) << 25) |
+                ((rs2 & 0x1f) << 20) |
+                ((rs1 & 0x1f) << 15) |
+                ((funct3 & 0x7) << 12) |
+                ((rd & 0x1f) << 7) |
+                (opcode & 0x7f)
+            ) >>> 0;
+        };
+
+        const encodeI = (imm, rs1, funct3, rd, opcode) => {
+            const imm12 = imm & 0xfff;
+            return (
+                ((imm12 & 0xfff) << 20) |
+                ((rs1 & 0x1f) << 15) |
+                ((funct3 & 0x7) << 12) |
+                ((rd & 0x1f) << 7) |
+                (opcode & 0x7f)
+            ) >>> 0;
+        };
+
+        const encodeS = (imm, rs2, rs1, funct3, opcode) => {
+            const imm12 = imm & 0xfff;
+            const imm4_0 = imm12 & 0x1f;
+            const imm11_5 = (imm12 >> 5) & 0x7f;
+            return (
+                ((imm11_5 & 0x7f) << 25) |
+                ((rs2 & 0x1f) << 20) |
+                ((rs1 & 0x1f) << 15) |
+                ((funct3 & 0x7) << 12) |
+                ((imm4_0 & 0x1f) << 7) |
+                (opcode & 0x7f)
+            ) >>> 0;
+        };
+
+        const encodeB = (imm, rs2, rs1, funct3, opcode) => {
+            // imm es desplazamiento en bytes (múltiplo de 2)
+            const imm13 = imm & 0x1fff;
+            const imm12 = (imm13 >> 12) & 0x1;
+            const imm10_5 = (imm13 >> 5) & 0x3f;
+            const imm4_1 = (imm13 >> 1) & 0x0f;
+            const imm11 = (imm13 >> 11) & 0x1;
+
+            return (
+                ((imm12 & 0x1) << 31) |
+                ((imm10_5 & 0x3f) << 25) |
+                ((rs2 & 0x1f) << 20) |
+                ((rs1 & 0x1f) << 15) |
+                ((funct3 & 0x7) << 12) |
+                ((imm4_1 & 0x0f) << 8) |
+                ((imm11 & 0x1) << 7) |
+                (opcode & 0x7f)
+            ) >>> 0;
+        };
+
+        const encodeU = (imm, rd, opcode) => {
+            const imm20 = imm & 0xfffff;
+            return (
+                ((imm20 & 0xfffff) << 12) |
+                ((rd & 0x1f) << 7) |
+                (opcode & 0x7f)
+            ) >>> 0;
+        };
+
+        const encodeJ = (imm, rd, opcode) => {
+            // imm es desplazamiento en bytes (múltiplo de 2)
+            const imm21 = imm & 0x1fffff;
+            const imm20 = (imm21 >> 20) & 0x1;
+            const imm10_1 = (imm21 >> 1) & 0x3ff;
+            const imm11 = (imm21 >> 11) & 0x1;
+            const imm19_12 = (imm21 >> 12) & 0xff;
+
+            return (
+                ((imm20 & 0x1) << 31) |
+                ((imm19_12 & 0xff) << 12) |
+                ((imm11 & 0x1) << 20) |
+                ((imm10_1 & 0x3ff) << 21) |
+                ((rd & 0x1f) << 7) |
+                (opcode & 0x7f)
+            ) >>> 0;
+        };
+
+        // ------------ R-TYPE ------------
+        if (mn === "add" || mn === "sub" || mn === "and" || mn === "or" || mn === "xor") {
+            const rd = reg(parts[1]);
+            const rs1 = reg(parts[2]);
+            const rs2 = reg(parts[3]);
+            let funct7 = 0x00;
+            let funct3 = 0x0;
+
+            if (mn === "add") { funct7 = 0x00; funct3 = 0x0; }
+            if (mn === "sub") { funct7 = 0x20; funct3 = 0x0; }
+            if (mn === "and") { funct7 = 0x00; funct3 = 0x7; }
+            if (mn === "or")  { funct7 = 0x00; funct3 = 0x6; }
+            if (mn === "xor") { funct7 = 0x00; funct3 = 0x4; }
+
+            return encodeR(funct7, rs2, rs1, funct3, rd, 0x33);
+        }
+
+        // ------------ I-TYPE ARITH / LOAD ------------
+        if (mn === "addi" || mn === "andi" || mn === "ori" || mn === "xori") {
+            const rd = reg(parts[1]);
+            const rs1 = reg(parts[2]);
+            const imm = immVal(parts[3]);
+            let funct3 = 0x0;
+            if (mn === "andi") funct3 = 0x7;
+            if (mn === "ori") funct3 = 0x6;
+            if (mn === "xori") funct3 = 0x4;
+
+            return encodeI(imm, rs1, funct3, rd, 0x13);
+        }
+
+        if (mn === "lw") {
+            const rd = reg(parts[1]);
+            // Sintaxis: lw rd, imm(rs1)
+            const offsetBase = parts[2];
+            const m = offsetBase.match(/^(-?\d+|0x[0-9a-fA-F]+)\((x\d{1,2})\)$/);
+            if (!m) throw new Error(`Formato lw inválido: ${clean}`);
+            const imm = immVal(m[1]);
+            const rs1 = reg(m[2]);
+            const funct3 = 0x2; // LW
+            return encodeI(imm, rs1, funct3, rd, 0x03);
+        }
+
+        // ------------ S-TYPE (STORE) ------------
+        if (mn === "sw") {
+            // Sintaxis: sw rs2, imm(rs1)
+            const rs2 = reg(parts[1]);
+            const offsetBase = parts[2];
+            const m = offsetBase.match(/^(-?\d+|0x[0-9a-fA-F]+)\((x\d{1,2})\)$/);
+            if (!m) throw new Error(`Formato sw inválido: ${clean}`);
+            const imm = immVal(m[1]);
+            const rs1 = reg(m[2]);
+            const funct3 = 0x2; // SW
+            return encodeS(imm, rs2, rs1, funct3, 0x23);
+        }
+
+        // ------------ BRANCHES ------------
+        if (mn === "beq" || mn === "bne") {
+            const rs1 = reg(parts[1]);
+            const rs2 = reg(parts[2]);
+            const imm = immVal(parts[3]);
+            let funct3 = 0x0;
+            if (mn === "bne") funct3 = 0x1;
+            return encodeB(imm, rs2, rs1, funct3, 0x63);
+        }
+
+        // ------------ U-TYPE ------------
+        if (mn === "lui") {
+            const rd = reg(parts[1]);
+            const imm = immVal(parts[2]);
+            return encodeU(imm, rd, 0x37);
+        }
+
+        // ------------ J-TYPE ------------
+        if (mn === "jal") {
+            const rd = reg(parts[1]);
+            const imm = immVal(parts[2]);
+            return encodeJ(imm, rd, 0x6f);
+        }
+
+        throw new Error(`Instrucción ensamblador no soportada: ${line}`);
     }
 
     decode(instr) {
