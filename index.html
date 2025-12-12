@@ -152,6 +152,25 @@
               </svg>
               Cargar Programa (Hex / ASM)
             </label>
+            <div class="preload-buttons">
+              <button class="btn-preload" id="btn-preload-collatz" title="Cargar secuencia de Collatz">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Collatz
+              </button>
+              <button class="btn-preload" id="btn-preload-fibonacci" title="Cargar secuencia de Fibonacci">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+                  <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+                  <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                  <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                Fibonacci
+              </button>
+            </div>
             <textarea id="program-input" placeholder="add x3, x4, x6&#10;sub x5, x3, x2&#10;lw x1, 0(x2)"></textarea>
             <button id="btn-load" class="btn-load">
               
