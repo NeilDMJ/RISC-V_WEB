@@ -17,8 +17,77 @@ let dpAnim = {
     svg: null,
     packetLayer: null,
     valueLayer: null,
-    rafIds: new Set(),
+    movers: [],
+    tickerId: null,
+    pathPointCache: new WeakMap(),
 };
+
+function getCachedPoint(pathEl, totalLen, t) {
+    // Cache de puntos muestreados para reducir costo de getPointAtLength()
+    // t: 0..1
+    const cached = dpAnim.pathPointCache.get(pathEl);
+    if (cached && cached.totalLen === totalLen) {
+        const idx = Math.max(0, Math.min(cached.points.length - 1, Math.round(t * (cached.points.length - 1))));
+        return cached.points[idx];
+    }
+
+    // Muestreo: suficiente para movimiento suave sin ser caro
+    const samples = 140;
+    const points = new Array(samples);
+    for (let i = 0; i < samples; i++) {
+        const lt = (i / (samples - 1)) * totalLen;
+        const p = pathEl.getPointAtLength(lt);
+        points[i] = { x: p.x, y: p.y };
+    }
+    dpAnim.pathPointCache.set(pathEl, { totalLen, points });
+
+    const idx = Math.max(0, Math.min(samples - 1, Math.round(t * (samples - 1))));
+    return points[idx];
+}
+
+function startDatapathTicker() {
+    if (dpAnim.tickerId != null) return;
+
+    const tick = (now) => {
+        // Si no hay animaciones vivas, apagar el ticker
+        if (!dpAnim.movers.length) {
+            dpAnim.tickerId = null;
+            return;
+        }
+
+        const easeOutQuad = (t) => 1 - Math.pow(1 - t, 2);
+
+        const alive = [];
+        for (const m of dpAnim.movers) {
+            const t = Math.min(1, (now - m.start) / m.durationMs);
+            const eased = easeOutQuad(t);
+
+            // Evitar getPointAtLength por frame: usar puntos cacheados
+            const p = getCachedPoint(m.pathEl, m.totalLen, eased);
+            if (m.kind === 'circle') {
+                m.el.setAttribute('cx', String(p.x));
+                m.el.setAttribute('cy', String(p.y));
+            } else {
+                m.el.setAttribute('transform', `translate(${p.x}, ${p.y + (m.yOffset || 0)})`);
+            }
+
+            if (t < 1) {
+                alive.push(m);
+            } else {
+                m.el.remove();
+            }
+        }
+        dpAnim.movers = alive;
+        dpAnim.tickerId = requestAnimationFrame(tick);
+    };
+
+    dpAnim.tickerId = requestAnimationFrame(tick);
+}
+
+function addMover(mover) {
+    dpAnim.movers.push(mover);
+    startDatapathTicker();
+}
 
 // ABI names para los registros
 const ABI_NAMES = [
@@ -101,6 +170,14 @@ function prepareDatapathAnimations() {
     const svg = document.querySelector('#datapath-container svg');
     if (!svg) return;
 
+    // Reiniciar ticker/animaciones previas (por si se recarga el SVG)
+    if (dpAnim.tickerId != null) {
+        cancelAnimationFrame(dpAnim.tickerId);
+        dpAnim.tickerId = null;
+    }
+    dpAnim.movers = [];
+    dpAnim.pathPointCache = new WeakMap();
+
     dpAnim.svg = svg;
 
     // Capa encima para paquetes (circles). No altera posiciones existentes.
@@ -158,23 +235,15 @@ function spawnPacketOnPath(pathEl, { durationMs = 420, radius = 3.2, soft = fals
     if (soft) circle.classList.add('dp-packet-soft');
     dpAnim.packetLayer.appendChild(circle);
 
-    const start = performance.now();
-    const raf = (now) => {
-        const t = Math.min(1, (now - start) / durationMs);
-        const eased = 1 - Math.pow(1 - t, 2); // easeOutQuad
-        const p = pathEl.getPointAtLength(totalLen * eased);
-        circle.setAttribute('cx', String(p.x));
-        circle.setAttribute('cy', String(p.y));
-        if (t < 1) {
-            const id = requestAnimationFrame(raf);
-            dpAnim.rafIds.add(id);
-        } else {
-            circle.remove();
-        }
-    };
-
-    const id = requestAnimationFrame(raf);
-    dpAnim.rafIds.add(id);
+    addMover({
+        kind: 'circle',
+        el: circle,
+        pathEl,
+        totalLen,
+        start: performance.now(),
+        durationMs,
+        yOffset: 0,
+    });
 }
 
 function formatDecimal32(value) {
@@ -216,17 +285,11 @@ function spawnValueTagOnPath(pathEl, value, { durationMs = 520, yOffset = -10 } 
     g.appendChild(text);
     dpAnim.valueLayer.appendChild(g);
 
-    // Medir y ajustar caja
-    let bb;
-    try {
-        bb = text.getBBox();
-    } catch {
-        bb = { x: 0, y: 0, width: 10, height: 10 };
-    }
+    // Evitar getBBox(): fuerza layout/reflow y causa tirones.
+    // Aproximación para monospace 11px: ~7px por carácter + padding.
     const padX = 8;
-    const padY = 5;
-    const w = Math.max(18, bb.width + padX * 2);
-    const h = Math.max(16, bb.height + padY * 2);
+    const w = Math.max(18, label.length * 7 + padX * 2);
+    const h = 18;
     bg.setAttribute('width', String(w));
     bg.setAttribute('height', String(h));
     bg.setAttribute('x', String(-w / 2));
@@ -234,19 +297,15 @@ function spawnValueTagOnPath(pathEl, value, { durationMs = 520, yOffset = -10 } 
     text.setAttribute('x', '0');
     text.setAttribute('y', '0');
 
-    const start = performance.now();
-    const raf = (now) => {
-        const t = Math.min(1, (now - start) / durationMs);
-        const eased = 1 - Math.pow(1 - t, 2);
-        const p = pathEl.getPointAtLength(totalLen * eased);
-        g.setAttribute('transform', `translate(${p.x}, ${p.y + yOffset})`);
-        if (t < 1) {
-            requestAnimationFrame(raf);
-        } else {
-            g.remove();
-        }
-    };
-    requestAnimationFrame(raf);
+    addMover({
+        kind: 'tag',
+        el: g,
+        pathEl,
+        totalLen,
+        start: performance.now(),
+        durationMs,
+        yOffset,
+    });
 }
 
 function datapathPing(selector) {
