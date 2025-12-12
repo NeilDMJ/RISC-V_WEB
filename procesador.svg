@@ -26,9 +26,9 @@
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
      showguides="false"
-     inkscape:zoom="0.26984761"
-     inkscape:cx="1552.7283"
-     inkscape:cy="1413.7609"
+     inkscape:zoom="0.38162215"
+     inkscape:cx="2678.0416"
+     inkscape:cy="1107.116"
      inkscape:window-width="1366"
      inkscape:window-height="740"
      inkscape:window-x="0"
@@ -781,19 +781,19 @@
         }
         
         /* ==== LÍNEAS/BUSES ==== */
-        path[id^="path"], path[id^="bus"], path[id^="imm"], 
-        path[id^="branch"], path[id^="alu"], path[id^="wer"], 
-        path[id^="wem"], path[id^="br-neg"] {
+        path[id^=&quot;path&quot;], path[id^=&quot;bus&quot;], path[id^=&quot;imm&quot;], 
+        path[id^=&quot;branch&quot;], path[id^=&quot;alu&quot;], path[id^=&quot;wer&quot;], 
+        path[id^=&quot;wem&quot;], path[id^=&quot;br-neg&quot;] {
             stroke: #64748b;
             stroke-width: 2.5;
             fill: none;
             transition: all 0.3s ease;
         }
         
-        path.active, path[id^="path"].active, path[id^="bus"].active, 
-        path[id^="imm"].active, path[id^="branch"].active, 
-        path[id^="alu"].active, path[id^="wer"].active, 
-        path[id^="wem"].active, path[id^="br-neg"].active {
+        path.active, path[id^=&quot;path&quot;].active, path[id^=&quot;bus&quot;].active, 
+        path[id^=&quot;imm&quot;].active, path[id^=&quot;branch&quot;].active, 
+        path[id^=&quot;alu&quot;].active, path[id^=&quot;wer&quot;].active, 
+        path[id^=&quot;wem&quot;].active, path[id^=&quot;br-neg&quot;].active {
             stroke: #3b82f6;
             stroke-width: 3.5;
             filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.9));
@@ -817,6 +817,19 @@
             font-family: 'Inter', sans-serif;
             font-size: 12px;
             pointer-events: none;
+        }
+        
+        /* ==== ETIQUETAS DE COMPONENTES ==== */
+        #component-labels text {
+            fill: #e2e8f0;
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            text-shadow: 
+                0 0 8px rgba(0, 0, 0, 0.9),
+                0 0 4px rgba(0, 0, 0, 0.8),
+                2px 2px 4px rgba(0, 0, 0, 0.7);
+            letter-spacing: 0.5px;
         }
         
         /* ==== HOVER (opcional) ==== */
@@ -1102,6 +1115,68 @@
          id="path58" /><path
          style="opacity:1;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#7fa53a;stroke-width:3.29999;stroke-linecap:square;stroke-linejoin:bevel;stroke-dasharray:none;paint-order:markers fill stroke;stroke-opacity:1"
          d="M 4.9609374,501.4015 109.55404,501.81491"
-         id="path59" /></g></g></svg>
+         id="path59" /></g></g><g
+     id="component-labels"
+     style="font-family:Arial,sans-serif;font-size:14px;font-weight:bold;fill:#e2e8f0;pointer-events:none"><text
+       x="35.640285"
+       y="285.56271"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text1">PC</text><text
+       x="185.29364"
+       y="129.91016"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text2">Instruction</text><text
+       x="183.907"
+       y="149.07002"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text3">Memory</text><text
+       x="600"
+       y="385"
+       text-anchor="middle"
+       style="font-size:13px;font-weight:bold"
+       id="text4">Register</text><text
+       x="600"
+       y="400"
+       text-anchor="middle"
+       style="font-size:13px;font-weight:bold"
+       id="text5">File</text><text
+       x="844.45349"
+       y="498.48279"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text6">Control</text><text
+       x="844.10687"
+       y="517.29602"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text7">Unit</text><text
+       x="846.53345"
+       y="255.70953"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:14px"
+       id="text8">ALU</text><text
+       x="1040.2639"
+       y="201.51062"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text9">Data</text><text
+       x="1039.7549"
+       y="215.77525"
+       text-anchor="middle"
+       style="font-weight:bold;font-size:13px"
+       id="text10">Memory</text><text
+       x="659.5072"
+       y="149.50722"
+       text-anchor="middle"
+       style="font-weight:600;font-size:11px"
+       id="text11">Sign Extend</text><text
+       x="109.01306"
+       y="474.92242"
+       text-anchor="middle"
+       style="font-weight:600;font-size:11px"
+       id="text12">PC + 4</text></g></svg>
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
