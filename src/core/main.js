@@ -133,6 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMemoryViewToggle();
 });
 
+function isWirePath(el) {
+    if (!el || el.tagName?.toLowerCase() !== 'path') return false;
+    const style = String(el.getAttribute('style') || '').toLowerCase();
+    const fillAttr = String(el.getAttribute('fill') || '').toLowerCase();
+    const hasNoFill = style.includes('fill:none') || fillAttr === 'none';
+    const hasStroke = style.includes('stroke:') || el.hasAttribute('stroke');
+    return hasNoFill && hasStroke;
+}
+
 /* ============================================================
    CARGAR SVG DEL DATAPATH
 ============================================================ */
@@ -202,14 +211,15 @@ function prepareDatapathAnimations() {
     }
     dpAnim.valueLayer = vlayer;
 
-    // Marcar cables (paths) para aplicar estilos externos
-    const wireSelector = 'path[id^="path"], path[id^="bus"], path[id^="imm"], path[id^="branch"], path[id^="alu"], path[id^="wer"], path[id^="wem"], path[id^="br-neg"]';
-    svg.querySelectorAll(wireSelector).forEach(p => p.classList.add('dp-wire'));
+    // Marcar cables reales (paths con fill:none) para aplicar estilos externos
+    svg.querySelectorAll('path').forEach((p) => {
+        if (isWirePath(p)) p.classList.add('dp-wire');
+    });
 
     // Marcar módulos para aplicar “breathing glow” cuando estén activos
     const moduleIds = [
         'pc', 'instr-mem', 'control-unit', 'registers', 'data-mem',
-        'alu', 'sign-extend', 'mux-wb', 'mux-alu-a', 'pc-adder'
+        'alu', 'sign-extend', 'mux-wb', 'mux-alu-a', 'mux-imm', 'pc-adder'
     ];
     moduleIds.forEach(id => {
         const el = svg.querySelector('#' + CSS.escape(id));
@@ -356,7 +366,7 @@ let moduleVisorState = {
 };
 
 function isFlatHoverModuleId(id) {
-    return id === 'sign-extend' || id === 'mux-wb' || id === 'mux-alu-a';
+    return id === 'sign-extend' || id === 'mux-wb' || id === 'mux-alu-a' || id === 'mux-imm';
 }
 
 function createModuleVisor() {
@@ -652,9 +662,8 @@ function setupBusTooltips() {
     const svg = document.querySelector('#datapath-container svg');
     if (!svg) return;
     
-    // Seleccionar todos los cables/buses relevantes (mismo set que se anima como dp-wire)
-    const wireSelector = 'path[id^="path"], path[id^="bus"], path[id^="imm"], path[id^="branch"], path[id^="alu"], path[id^="wer"], path[id^="wem"], path[id^="br-neg"]';
-    const buses = svg.querySelectorAll(wireSelector);
+    // Seleccionar SOLO cables reales (evita que shapes como MUXes se traten como buses)
+    const buses = Array.from(svg.querySelectorAll('path')).filter(isWirePath);
     const tooltip = document.getElementById('bus-tooltip');
     if (!tooltip) createBusTooltip();
     
@@ -1175,6 +1184,7 @@ function illuminateDatapathComponents(stage) {
             '#control-unit',
             '#registers',
             '#sign-extend',
+            '#mux-imm',
             // Buses de datos
             'path[id^="path50"]',
             'path[id^="path51"]',
