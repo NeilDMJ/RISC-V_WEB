@@ -26,16 +26,21 @@
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
      showguides="false"
-     inkscape:zoom="0.38162215"
-     inkscape:cx="2678.0416"
-     inkscape:cy="1107.116"
-     inkscape:window-width="1366"
-     inkscape:window-height="740"
+     inkscape:zoom="0.26984761"
+     inkscape:cx="1541.6108"
+     inkscape:cy="987.59444"
+     inkscape:window-width="1536"
+     inkscape:window-height="836"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg1" /><defs
-     id="defs1"><linearGradient
+     inkscape:current-layer="layer1" /><defs
+     id="defs1"><rect
+   x="416.90197"
+   y="1326.6747"
+   width="113.02676"
+   height="107.46806"
+   id="rect13" /><linearGradient
    id="swatch92"><stop
      style="stop-color:#000000;stop-opacity:1;"
      offset="0"
@@ -766,7 +771,7 @@
         
         /* ==== MULTIPLEXORES Y OTROS ==== */
         #mux-wb, #mux-alu-a,
-        #path8, #path12, #path13, #path14, #path35, #not {
+        #path8, #path12, #path13, #mux-imm, #path35, #not {
           fill: #081a1a;
           stroke: #2dd4bf;
             transition: all 0.3s ease;
@@ -781,7 +786,7 @@
         
         #mux-wb.active, #mux-alu-a.active,
         #path8.active, #path12.active, #path13.active,
-        #path14.active, #path35.active, #not.active {
+        #mux-imm.active, #path35.active, #not.active {
             fill: #22c55e;
             stroke: #16a34a;
             filter: drop-shadow(0 0 10px rgba(34, 197, 94, 0.7));
@@ -1035,17 +1040,20 @@
        style="display:inline;opacity:1;mix-blend-mode:normal;fill:#1e293b;fill-opacity:1;stroke:url(#linearGradient20);stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1"><path
          style="fill:#1e293b;fill-opacity:1;stroke:url(#linearGradient18);stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1"
          d="m 373.45294,522.24462 v 19.29352 l -16.51643,-9.20826 z"
-         id="path19" /><ellipse
+         id="path19"
+         inkscape:label="not" /><ellipse
          style="fill:#1e293b;fill-opacity:1;stroke:url(#linearGradient19);stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1"
          id="path20"
          cx="351.8208"
          cy="532.0376"
          rx="5.4080319"
-         ry="4.969543" /></g><path
+         ry="4.969543"
+         inkscape:label="not" /></g><path
        style="display:inline;opacity:1;mix-blend-mode:normal;fill:#1e293b;fill-opacity:1;stroke:#000000;stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1;paint-order:markers fill stroke"
        d="m 258.6553,508.2625 17.88005,-0.20669 -0.10337,35.76008 -18.29345,0.31006 c -2.31293,-0.14123 -4.86898,-1.59246 -8.88834,-4.85758 -5.34842,-4.95521 -4.91827,-7.47104 -6.09782,-12.19566 0.34465,-4.50267 0.96825,-7.7722 3.7207,-11.47215 l 1.91061,-2.34103 c 2.41049,-2.33984 2.8861,-2.46779 3.9805,-3.24003 3.25629,-1.44739 4.12569,-1.30352 5.89112,-1.757 z"
        id="path35"
-       transform="translate(-10.091659,-87.409644)" /></g><g
+       transform="translate(-10.091659,-87.409644)"
+       inkscape:label="and" /></g><g
      inkscape:groupmode="layer"
      id="layer1"
      inkscape:label="multiplexores"
@@ -1061,15 +1069,18 @@
        style="display:inline;opacity:1;mix-blend-mode:normal;fill:#1e293b;fill-opacity:1;stroke:url(#linearGradient13);stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1"
        d="m 335.5967,476.4956 v 77.75874 l -31.42503,-15.63944 0.29231,-48.23381 z"
        id="path13"
-       transform="translate(-10.091659,-87.409644)" /><path
+       transform="translate(-10.091659,-87.409644)"
+       inkscape:label="mux" /><path
        style="display:inline;opacity:1;mix-blend-mode:normal;fill:#1e293b;fill-opacity:1;stroke:url(#linearGradient12);stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1"
        d="m 114.89146,485.93829 75.44759,-0.2067 -13.22916,32.45279 -47.95573,0.20672 z"
        id="path12"
-       transform="translate(-10.091659,-87.409644)" /><path
+       transform="translate(-10.091659,-87.409644)"
+       inkscape:label="mux" /><path
        style="display:inline;opacity:1;mix-blend-mode:normal;fill:#1e293b;fill-opacity:1;stroke:url(#linearGradient14);stroke-width:2.5;stroke-dasharray:none;stroke-opacity:1"
-      d="m 415.02819,196.13686 30.59245,13.84928 v 53.33008 l -29.55893,14.6761 z"
+       d="m 415.02819,196.13686 30.59245,13.84928 v 53.33008 l -29.55893,14.6761 z"
       id="mux-imm"
-       transform="translate(-10.091659,-87.409644)" /></g><g
+       transform="translate(-10.091659,-87.409644)"
+       inkscape:label="mux" /></g><g
      inkscape:groupmode="layer"
      id="layer8"
      inkscape:label="memory-lines"><path
@@ -1244,6 +1255,20 @@
        y="474.92242"
        text-anchor="middle"
        style="font-weight:600;font-size:11px"
-       id="text12">PC + 4</text></g></svg>
+       id="text12">PC + 4</text></g><text
+     xml:space="preserve"
+     transform="scale(0.26458333)"
+     id="text13"
+     style="fill:none;text-orientation:auto;stroke-width:12.47244094;paint-order:markers fill stroke;stroke-linecap:square;stroke-linejoin:bevel;stroke:#9e3939;text-align:start;writing-mode:lr-tb;direction:ltr;white-space:pre;shape-inside:url(#rect13)" /><text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:29.1042px;font-family:'Adwaita Mono';-inkscape-font-specification:'Adwaita Mono';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.8;stroke-linecap:square;stroke-linejoin:bevel;stroke-opacity:1;paint-order:markers fill stroke;stroke-dasharray:none"
+     x="114.71752"
+     y="371.60635"
+     id="text14"><tspan
+       sodipodi:role="line"
+       id="tspan14"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:29.1042px;font-family:'Adwaita Mono';-inkscape-font-specification:'Adwaita Mono';fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.8;stroke-opacity:1;stroke-dasharray:none"
+       x="114.71752"
+       y="371.60635">4</tspan></text></svg>
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
