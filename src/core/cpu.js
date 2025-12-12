@@ -30,22 +30,10 @@ export class RISCVProcessor {
 
         // Banco de registros
         this.state.regs = new Uint32Array(32);
-        this.state.regs[0] = 0x00000000 >>> 0;
-        this.state.regs[1] = 0x00000001 >>> 0;
-        this.state.regs[2] = 0x00000002 >>> 0;
-        this.state.regs[3] = 0xfffffffd >>> 0;
-        this.state.regs[4] = 0x00000000 >>> 0;
-        this.state.regs[5] = 0x00000005 >>> 0;
-        this.state.regs[7] = 0x00000007 >>> 0;
+
 
         // Memoria de datos
         this.state.dataMem = new Uint32Array(32);
-        this.state.dataMem.set([
-            0x00000005,
-            0x000000af,
-            0x000000d2,
-            0x00000003
-        ]);
 
         // No borramos instrMem aquí para persistir el programa cargado
     }
