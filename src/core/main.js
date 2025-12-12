@@ -10,6 +10,7 @@ let runInterval = null;
 let displayFormat = 'dec'; // 'hex', 'dec', 'bin'
 let executionDelay = 600; // Delay en ms entre ciclos de ejecución
 let currentMemoryView = 'grid'; // 'grid' o 'table'
+let lastStepResult = null; // Almacenar último resultado para tooltips
 
 // ABI names para los registros
 const ABI_NAMES = [
@@ -25,6 +26,7 @@ const ABI_NAMES = [
 document.addEventListener('DOMContentLoaded', () => {
     loadDatapathSVG();
     updateUI();
+    createBusTooltip();
 
     // Event listeners seguros (verifica que el elemento existe antes de agregar listener)
     const btnStep = document.getElementById('btn-step');
@@ -72,9 +74,141 @@ async function loadDatapathSVG() {
             svg.style.position = 'relative';
             svg.style.zIndex = '2';
         }
+        
+        // Configurar tooltips para buses después de cargar SVG
+        setupBusTooltips();
     } catch (error) {
         console.error('Error cargando el SVG del datapath:', error);
     }
+}
+
+/* ============================================================
+   BUS TOOLTIPS
+============================================================ */
+function createBusTooltip() {
+    // Crear elemento tooltip si no existe
+    if (document.getElementById('bus-tooltip')) return;
+    
+    const tooltip = document.createElement('div');
+    tooltip.id = 'bus-tooltip';
+    tooltip.className = 'bus-tooltip';
+    tooltip.style.cssText = `
+        position: fixed;
+        background: rgba(15, 23, 42, 0.95);
+        border: 2px solid #3b82f6;
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: #e2e8f0;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        pointer-events: none;
+        z-index: 10000;
+        display: none;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        white-space: nowrap;
+    `;
+    document.body.appendChild(tooltip);
+}
+
+function setupBusTooltips() {
+    const svg = document.querySelector('#datapath-container svg');
+    if (!svg) return;
+    
+    // Seleccionar todos los buses/paths
+    const buses = svg.querySelectorAll('path[id^="path"], path[id^="bus"], path[id^="imm"], path[id^="alu"]');
+    const tooltip = document.getElementById('bus-tooltip');
+    if (!tooltip) createBusTooltip();
+    
+    buses.forEach(bus => {
+        bus.addEventListener('mouseenter', (e) => showBusTooltip(e, bus));
+        bus.addEventListener('mousemove', (e) => moveBusTooltip(e));
+        bus.addEventListener('mouseleave', () => hideBusTooltip());
+        bus.style.cursor = 'pointer';
+    });
+}
+
+function getBusValue(busId) {
+    if (!lastStepResult) return null;
+    
+    const { decoded, alu_res, rs1_val, rs2_val, mem_data } = lastStepResult;
+    const regs = cpu.state.registers;
+    
+    // Mapeo de buses a valores
+    const busMap = {
+        // Buses PC
+        'bus-pc-im': { label: 'PC → Instruction Memory', value: cpu.state.pc },
+        'bus-pc-inc': { label: 'PC → PC+4', value: cpu.state.pc },
+        'path57': { label: 'PC Loop', value: cpu.state.pc },
+        'path58': { label: 'PC Increment', value: cpu.state.pc + 4 },
+        'path59': { label: 'PC+4 Result', value: cpu.state.pc + 4 },
+        
+        // Inmediatos
+        'imm(11:15)': { label: 'Immediate [11:15]', value: decoded?.imm },
+        'imm(4:0)': { label: 'Immediate [4:0]', value: decoded?.imm },
+        'imm-rd': { label: 'Immediate → RD', value: decoded?.imm },
+        
+        // Registro fuente
+        'path50': { label: 'RS1 Index', value: decoded?.rs1 },
+        'path51': { label: 'RS2 Index', value: decoded?.rs2 },
+        'path90': { label: 'RS1 Data', value: rs1_val },
+        'path92': { label: 'RS2 Data (ALU)', value: rs2_val },
+        
+        // ALU
+        'path81': { label: 'ALU Input A', value: rs1_val },
+        'path3': { label: 'ALU Input B', value: rs2_val || decoded?.imm },
+        'path78': { label: 'ALU Result', value: alu_res },
+        'alu-reg(0)': { label: 'ALU → Registers', value: alu_res },
+        
+        // Memoria de datos
+        'path82': { label: 'Memory Address', value: alu_res },
+        'path84': { label: 'Write Data → Memory', value: rs2_val },
+        'path80': { label: 'Read Data from Memory', value: mem_data },
+        'path86': { label: 'Memory → MUX', value: mem_data },
+        
+        // Write-back
+        'path91': { label: 'Data → Register File', value: mem_data || alu_res }
+    };
+    
+    return busMap[busId] || null;
+}
+
+function showBusTooltip(event, bus) {
+    const tooltip = document.getElementById('bus-tooltip');
+    if (!tooltip) return;
+    
+    const busValue = getBusValue(bus.id);
+    if (!busValue) {
+        tooltip.style.display = 'none';
+        return;
+    }
+    
+    let valueStr;
+    if (busValue.value === undefined || busValue.value === null) {
+        valueStr = '--';
+    } else {
+        const val = busValue.value >>> 0; // Convertir a unsigned
+        valueStr = `0x${val.toString(16).toUpperCase().padStart(8, '0')} (${toInt32(val)})`;
+    }
+    
+    tooltip.innerHTML = `
+        <div style="font-weight: bold; color: #3b82f6; margin-bottom: 4px;">${busValue.label}</div>
+        <div style="color: #22c55e;">${valueStr}</div>
+    `;
+    tooltip.style.display = 'block';
+    moveBusTooltip(event);
+}
+
+function moveBusTooltip(event) {
+    const tooltip = document.getElementById('bus-tooltip');
+    if (!tooltip || tooltip.style.display === 'none') return;
+    
+    tooltip.style.left = (event.pageX + 15) + 'px';
+    tooltip.style.top = (event.pageY + 15) + 'px';
+}
+
+function hideBusTooltip() {
+    const tooltip = document.getElementById('bus-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
 }
 
 /* ============================================================
@@ -184,6 +318,9 @@ async function handleStep() {
 
     const result = await cpu.stepWithStageDelay(updateStageIndicator, 400);
     if (result) {
+        // Almacenar resultado para tooltips
+        lastStepResult = result;
+        
         // Detectar si la instrucción accede a memoria
         if (result.decoded.opcode === 0x03 || result.decoded.opcode === 0x23) {
             const addrIndex = (result.alu_res >>> 2) & 0x1f;
@@ -220,7 +357,10 @@ async function handleRun(e) {
         while (isRunning && !cpu.state.halted) {
             const stageDelay = Math.min(executionDelay / 5, 300);
             const result = await cpu.stepWithStageDelay(updateStageIndicator, stageDelay);
-            if (result) updateUI(result);
+            if (result) {
+                lastStepResult = result;
+                updateUI(result);
+            }
             await new Promise(resolve => setTimeout(resolve, executionDelay / 5));
         }
 
@@ -246,6 +386,7 @@ function handleReset() {
     runBtn.classList.remove('active');
 
     lastDecoded = null;
+    lastStepResult = null;
     memoryAccessCount = 0;
     lastMemoryAddr = null;
     lastMemoryOp = '--';
