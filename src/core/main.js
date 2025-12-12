@@ -62,8 +62,10 @@ function startDatapathTicker() {
             const t = Math.min(1, (now - m.start) / m.durationMs);
             const eased = easeOutQuad(t);
 
+            const tt = m.reverse ? (1 - eased) : eased;
+
             // Evitar getPointAtLength por frame: usar puntos cacheados
-            const p = getCachedPoint(m.pathEl, m.totalLen, eased);
+            const p = getCachedPoint(m.pathEl, m.totalLen, tt);
             if (m.kind === 'circle') {
                 m.el.setAttribute('cx', String(p.x));
                 m.el.setAttribute('cy', String(p.y));
@@ -227,7 +229,7 @@ function prepareDatapathAnimations() {
     });
 }
 
-function spawnPacketOnPath(pathEl, { durationMs = 420, radius = 3.2, soft = false } = {}) {
+function spawnPacketOnPath(pathEl, { durationMs = 420, radius = 3.2, soft = false, reverse = false } = {}) {
     if (!dpAnim.svg || !dpAnim.packetLayer || !pathEl) return;
     if (typeof pathEl.getTotalLength !== 'function') return;
 
@@ -253,6 +255,7 @@ function spawnPacketOnPath(pathEl, { durationMs = 420, radius = 3.2, soft = fals
         start: performance.now(),
         durationMs,
         yOffset: 0,
+        reverse,
     });
 }
 
@@ -262,7 +265,7 @@ function formatDecimal32(value) {
     return String(toInt32(u));
 }
 
-function spawnValueTagOnPath(pathEl, value, { durationMs = 520, yOffset = -10 } = {}) {
+function spawnValueTagOnPath(pathEl, value, { durationMs = 520, yOffset = -10, reverse = false } = {}) {
     if (!dpAnim.svg || !dpAnim.valueLayer || !pathEl) return;
     if (typeof pathEl.getTotalLength !== 'function') return;
 
@@ -315,6 +318,7 @@ function spawnValueTagOnPath(pathEl, value, { durationMs = 520, yOffset = -10 } 
         start: performance.now(),
         durationMs,
         yOffset,
+        reverse,
     });
 }
 
@@ -690,6 +694,7 @@ function getBusValue(busId, stepResultOverride = null) {
         return { label: busId, value: null, hint: 'Ejecuta Step/Run para ver datos' };
     }
 
+    const instr = (sr.instr ?? 0) >>> 0;
     const decoded = sr.decoded;
     const ctrl = sr.ctrl;
     const alu_res = sr.alu_res;
@@ -697,6 +702,15 @@ function getBusValue(busId, stepResultOverride = null) {
     const rs2_val = sr.rs2_val;
     const mem_data = sr.mem_data;
     const pc_before = sr.pc_before;
+
+    // Salida del MUX de write-back (dato que “viaja” por el bus a RegFile), aun si RegWrite=0
+    const wb_bus = (decoded?.opcode === 0x03 && ctrl?.alu2reg)
+        ? (mem_data ?? null)
+        : (alu_res ?? null);
+
+    // Selector del mux-imm: 1 cuando la instrucción es STORE (instr[11:7] son imm[4:0])
+    // y 0 cuando se usa como RD (I/R/Load/etc). En este simulador, STORE => ctrl.wem.
+    const imm_rd_sel = ctrl?.wem ? 1 : 0;
     
     // Mapeo de buses a valores
     const busMap = {
@@ -706,21 +720,32 @@ function getBusValue(busId, stepResultOverride = null) {
         'path57': { label: 'PC Loop', value: pc_before, src: 'pc_before' },
         'path58': { label: 'PC Increment', value: (pc_before + 4) >>> 0, src: 'pc_before + 4' },
         'path59': { label: 'PC+4 Result', value: (pc_before + 4) >>> 0, src: 'pc_before + 4' },
+
+        // Instrucción completa (32 bits)
+        'path49': { label: 'Instruction (32-bit)', value: instr, src: 'instr[31:0]' },
         
         // Inmediatos
-        'imm(11:15)': { label: 'Immediate [11:15]', value: decoded?.imm, src: 'decoded.imm' },
-        'imm(4:0)': { label: 'Immediate [4:0]', value: decoded?.imm, src: 'decoded.imm' },
-        'imm-rd': { label: 'Immediate → RD', value: decoded?.imm, src: 'decoded.imm' },
+        // Nota: en el datapath, estos wires vienen directo de la instrucción.
+        // imm[11:5] = instr[31:25] (7 bits)
+        'imm(11:15)': { label: 'Immediate [11:5] (instr[31:25])', value: (instr >>> 25) & 0x7f, src: 'instr[31:25]' },
+        // imm[4:0] = instr[11:7] (5 bits) (útil para S-type)
+        'imm(4:0)': { label: 'Immediate [4:0] (instr[11:7])', value: (instr >>> 7) & 0x1f, src: 'instr[11:7]' },
+        // Este es el inmediato ya extendido (salida del sign-extend / imm generator)
+        'imm-rd': { label: 'MUX-IMM Select (imm[4:0] vs rd)', value: imm_rd_sel, src: 'ctrl.wem (STORE?)' },
         
         // Señales hacia/desde banco de registros
         // Nota: algunos IDs del SVG no están nombrados como rs1/rs2/rd; aquí se mapean según el uso.
-        'path50': { label: 'RS1 (reg index)', value: decoded?.rs1, src: 'decoded.rs1' },
-        // Ajuste solicitado: este cable corresponde a RD (no RS2)
-        'path51': { label: 'RD (reg index)', value: decoded?.rd, src: 'decoded.rd' },
-        // Ajuste solicitado: path89 es RS2 (dato)
-        'path89': { label: 'RS2 DATA', value: rs2_val, src: 'rs2_val' },
-        'path90': { label: 'RS1 DATA', value: rs1_val, src: 'rs1_val' },
-        'path92': { label: 'RS2 DATA (ALU)', value: rs2_val, src: 'rs2_val' },
+        // Según tu lista:
+        // - path50 = instr[11:7]
+        // - path51 = instr[24:20]
+        // - path89 = instr[19:15]
+        // - path90 = instr[24:20]
+        // - path92 = instr[11:7]
+        'path50': { label: 'RD field (instr[11:7])', value: (instr >>> 7) & 0x1f, src: 'instr[11:7]' },
+        'path51': { label: 'RS2 field (instr[24:20])', value: (instr >>> 20) & 0x1f, src: 'instr[24:20]' },
+        'path89': { label: 'RS1 field (instr[19:15])', value: (instr >>> 15) & 0x1f, src: 'instr[19:15]' },
+        'path90': { label: 'RS2 field (instr[24:20])', value: (instr >>> 20) & 0x1f, src: 'instr[24:20]' },
+        'path92': { label: 'RD field (instr[11:7])', value: (instr >>> 7) & 0x1f, src: 'instr[11:7]' },
         
         // ALU
         'path81': { label: 'ALU Input A', value: rs1_val, src: 'rs1_val' },
@@ -735,16 +760,16 @@ function getBusValue(busId, stepResultOverride = null) {
         'path86': { label: 'Memory → MUX', value: mem_data, src: 'mem_data' },
         
         // Write-back
-        'path91': { label: 'Data → Register File', value: sr.wb_val, src: 'wb_val' },
+        'path91': { label: 'WB Bus → Register File', value: (wb_bus ?? sr.wb_val), src: 'wb_bus (alu2reg ? mem_data : alu_res)' },
 
         // Señales de control (paths con id directo)
-        'alu-op': { label: 'ALUOp', value: ctrl?.alu_op, src: 'ctrl.alu_op' },
-        'alu-src': { label: 'ALUSrc', value: ctrl?.alu_src, src: 'ctrl.alu_src' },
-        'alu2reg': { label: 'ALU2Reg', value: ctrl?.alu2reg, src: 'ctrl.alu2reg' },
-        'wem': { label: 'MemWrite (WEM)', value: ctrl?.wem, src: 'ctrl.wem' },
+        'alu-op': { label: 'ALUOp (4-bit)', value: (ctrl?.alu_op ?? 0) & 0xf, src: 'ctrl.alu_op & 0xF' },
+        'alu-src': { label: 'ALUSrc (sel)', value: (ctrl?.alu_src ?? 0) ? 1 : 0, src: 'ctrl.alu_src' },
+        'alu2reg': { label: 'ALU2Reg (sel)', value: (ctrl?.alu2reg ?? 0) ? 1 : 0, src: 'ctrl.alu2reg' },
+        'wem': { label: 'MemWrite (WEM)', value: (ctrl?.wem ?? 0) ? 1 : 0, src: 'ctrl.wem' },
         'wer': { label: 'RegWrite (WER)', value: sr.wb_we ? 1 : 0, src: 'wb_we' },
-        'branch': { label: 'Branch', value: ctrl?.branch, src: 'ctrl.branch' },
-        'br-neg': { label: 'BranchNE', value: ctrl?.branch_ne, src: 'ctrl.branch_ne' }
+        'branch': { label: 'Branch (sel)', value: (ctrl?.branch ?? 0) ? 1 : 0, src: 'ctrl.branch' },
+        'br-neg': { label: 'BranchNE (sel)', value: (ctrl?.branch_ne ?? 0) ? 1 : 0, src: 'ctrl.branch_ne' }
     };
 
     // Fallback: mostrar al menos el ID del bus aunque no haya mapeo
@@ -1098,11 +1123,14 @@ function animateStageDataFlow(stage, stageData = null) {
 
     // Buses clave por etapa (IDs existentes en el SVG)
     const stageBuses = {
-        [Stage.FETCH]: ['bus-pc-im', 'path58', 'path59'],
+        [Stage.FETCH]: ['bus-pc-im', 'path49', 'path58', 'path59'],
         // Decode: índices rs1/rd + inmediato + señales de control
         [Stage.DECODE]: [
             'path50',
             'path51',
+            'path89',
+            'path90',
+            'path92',
             'imm(11:15)',
             'imm(4:0)',
             'imm-rd',
@@ -1114,7 +1142,7 @@ function animateStageDataFlow(stage, stageData = null) {
             'wem'
         ],
         // Exec: datos saliendo del banco de registros y entrando a la ALU
-        [Stage.EXEC]: ['path90', 'path89', 'path92', 'path81', 'path3', 'path78'],
+        [Stage.EXEC]: ['path81', 'path3', 'path78'],
         [Stage.MEM]: ['path82', 'path84', 'path80'],
         [Stage.WB]: ['alu-reg(0)', 'path91']
     };
@@ -1124,27 +1152,23 @@ function animateStageDataFlow(stage, stageData = null) {
         const el = svg.querySelector('#' + escapeSvgId(id));
         if (!el) return;
 
+        // Algunos paths en el SVG están dibujados “al revés”. Invertimos SOLO los que lo necesitan.
+        const reverseSignals = new Set(['br-neg', 'branch', 'imm-rd', 'alu-src', 'alu2reg', 'wem', 'alu-op']);
+        const reverse = reverseSignals.has(id);
+
         const durationMs = Math.max(350, Math.round(visualStageDelayMs * 0.8));
         const staggerMs = Math.max(35, Math.round(visualStageDelayMs * 0.12));
         const delayMs = i * staggerMs;
 
         // Paquete visual recorriendo el cable durante la etapa
         setTimeout(() => {
-            spawnPacketOnPath(el, { durationMs, radius: 3.0, soft: i > 1 });
+            spawnPacketOnPath(el, { durationMs, radius: 3.0, soft: i > 1, reverse });
 
             // Etiqueta numérica (decimal) viajando por el mismo cable
             const v = getBusValue(id, stageData)?.value;
             if (v === null || v === undefined) return;
 
-            // Para cables de control: solo mostrar cuando la señal está activa (evita llenar de ceros)
-            const isControl = ['branch', 'br-neg', 'alu-src', 'alu2reg', 'wem', 'imm-rd'].includes(id);
-            const alwaysShow = ['alu-op'];
-            if (isControl && !alwaysShow.includes(id)) {
-                const n = Number(v);
-                if (Number.isFinite(n) && n === 0) return;
-            }
-
-            spawnValueTagOnPath(el, v, { durationMs, yOffset: -10 });
+            spawnValueTagOnPath(el, v, { durationMs, yOffset: -10, reverse });
         }, delayMs);
     });
 
@@ -1175,6 +1199,7 @@ function illuminateDatapathComponents(stage) {
             '#instr-mem',
             '#pc-adder',
             // Buses de datos
+            '#path49',
             '#path57', '#path58', '#path59',
             'path[id^="bus-pc"]'
         ],
@@ -1188,6 +1213,9 @@ function illuminateDatapathComponents(stage) {
             // Buses de datos
             'path[id^="path50"]',
             'path[id^="path51"]',
+            'path[id^="path89"]',
+            'path[id^="path90"]',
+            'path[id^="path92"]',
             'path[id^="imm"]',
             // Líneas de control activas desde control unit
             '#alu-op',      // Control de operación ALU
@@ -1208,8 +1236,6 @@ function illuminateDatapathComponents(stage) {
             // Buses de datos
             'path[id^="path3"]',
             'path[id^="path81"]',
-            'path[id^="path90"]',   // a2 - segundo operando ALU
-            'path[id^="path92"]',   // ad - dirección desde registros
             // Líneas de control activas
             '#alu-op',      // Operación de la ALU
             '#alu-src',     // Selección de fuente para ALU
