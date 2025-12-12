@@ -368,46 +368,77 @@ function illuminateDatapathComponents(stage) {
     // Definir qué componentes se iluminan en cada etapa
     const stageComponents = {
         [Stage.FETCH]: [
+            // Componentes principales
             '#pc',
             '#instr-mem',
             '#pc-adder',
+            // Buses de datos
             '#path57', '#path58', '#path59',
             'path[id^="bus-pc"]'
         ],
         [Stage.DECODE]: [
+            // Componentes principales
             '#instr-mem',
             '#control-unit',
             '#registers',
             '#sign-extend',
+            // Buses de datos
             'path[id^="path50"]',
             'path[id^="path51"]',
-            'path[id^="imm"]'
+            'path[id^="imm"]',
+            // Líneas de control activas desde control unit
+            '#alu-op',      // Control de operación ALU
+            '#alu-src',     // Control de fuente para ALU (reg vs imm)
+            '#wem',         // Write enable memoria
+            '#wer',         // Write enable registros
+            '#alu2reg',     // Control mux write-back
+            '#branch',      // Señal de branch
+            '#br-neg',      // Señal de branch negado
+            '#imm-rd'       // Línea de inmediato hacia rd
         ],
         [Stage.EXEC]: [
+            // Componentes principales
             '#alu',
             '#mux-alu-a',
             '#registers',
             '#sign-extend',
+            // Buses de datos
             'path[id^="path3"]',
             'path[id^="path81"]',
-            '#alu-op'
+            'path[id^="path90"]',   // a2 - segundo operando ALU
+            'path[id^="path92"]',   // ad - dirección desde registros
+            // Líneas de control activas
+            '#alu-op',      // Operación de la ALU
+            '#alu-src',     // Selección de fuente para ALU
+            '#branch',      // Branch activo en etapa de ejecución
+            '#br-neg'       // Branch negado
         ],
         [Stage.MEM]: [
+            // Componentes principales
             '#data-mem',
             '#alu',
+            // Buses de datos
             'path[id^="path78"]',
             'path[id^="path82"]',
             'path[id^="path84"]',
             'path[id^="path80"]',
-            '#wem'
+            'path[id^="path86"]',   // do2 - dato de memoria
+            // Líneas de control activas
+            '#wem',         // Write enable para memoria de datos
+            '#branch',      // Branch (decisión basada en resultado ALU)
+            '#br-neg'       // Branch negado
         ],
         [Stage.WB]: [
+            // Componentes principales
             '#mux-wb',
             '#data-mem',
             '#registers',
+            // Buses de datos
             'path[id^="alu-reg"]',
-            '#alu2reg',
-            '#wer'
+            'path[id^="path91"]',   // di - dato hacia registros
+            // Líneas de control activas
+            '#alu2reg',     // Selección de fuente para write-back (ALU vs MEM)
+            '#wer'          // Write enable para banco de registros
         ]
     };
     
