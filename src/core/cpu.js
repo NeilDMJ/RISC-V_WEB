@@ -364,4 +364,79 @@ export class RISCVProcessor {
             alu_b
         };
     }
+
+    // Método asíncrono que ejecuta cada etapa con delays
+    async stepWithStageDelay(onStageUpdate, stageDelay = 400) {
+        if (this.state.halted) return null;
+
+        this.state.cycle++;
+
+        // FETCH
+        if (onStageUpdate) onStageUpdate(Stage.FETCH);
+        await this._delay(stageDelay);
+        const index = (this.state.pc >>> 2) & 0xff;
+        const instr = this.state.instrMem[index] >>> 0;
+
+        // DECODE
+        if (onStageUpdate) onStageUpdate(Stage.DECODE);
+        await this._delay(stageDelay);
+        const decoded = this.decode(instr);
+        const ctrl = controlUnit(decoded);
+        const { rs1, rs2, rd, imm } = decoded;
+
+        // READ REGISTERS
+        const a = this.state.regs[rs1] | 0;
+        let breg = this.state.regs[rs2] | 0;
+
+        // EXEC
+        if (onStageUpdate) onStageUpdate(Stage.EXEC);
+        await this._delay(stageDelay);
+        const alu_b = ctrl.alu_src ? imm : breg;
+        const alu_res = alu(a, alu_b, ctrl.alu_op);
+
+        // MEM
+        if (onStageUpdate) onStageUpdate(Stage.MEM);
+        await this._delay(stageDelay);
+        let memData = 0;
+        if (ctrl.wem) {
+            const addrIndex = (alu_res >>> 2) & 0x1f;
+            this.state.dataMem[addrIndex] = breg >>> 0;
+        } else if (decoded.opcode === 0x03) {
+            const addrIndex = (alu_res >>> 2) & 0x1f;
+            memData = this.state.dataMem[addrIndex] >>> 0;
+        }
+
+        // BRANCH
+        let pc_next = (this.state.pc + 4) | 0;
+        if (ctrl.branch) {
+            let take = false;
+            if (!ctrl.branch_ne && alu_res === 1) take = true; // BEQ
+            if (ctrl.branch_ne && alu_res === 0) take = true; // BNE
+            if (take) {
+                pc_next = (this.state.pc + (decoded.imm | 0)) | 0;
+            }
+        }
+
+        // WB
+        if (onStageUpdate) onStageUpdate(Stage.WB);
+        await this._delay(stageDelay);
+        if (!ctrl.wem && decoded.opcode !== 0x63 && rd !== 0) {
+            const value = decoded.opcode === 0x03 && ctrl.alu2reg ? memData : alu_res;
+            this.state.regs[rd] = value >>> 0;
+        }
+
+        this.state.pc = pc_next >>> 0;
+
+        return {
+            instr,
+            decoded,
+            ctrl,
+            alu_res,
+            alu_b
+        };
+    }
+
+    _delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 }

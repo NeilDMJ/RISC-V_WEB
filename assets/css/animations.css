@@ -28,3 +28,19 @@
         stroke-dashoffset: -20;
     }
 }
+
+/* Animación de pulso brillante para las pills activas */
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 
+            0 0 20px rgba(34, 197, 94, 0.6),
+            0 0 40px rgba(34, 197, 94, 0.4),
+            0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 30px rgba(34, 197, 94, 0.8),
+            0 0 60px rgba(34, 197, 94, 0.6),
+            0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+}

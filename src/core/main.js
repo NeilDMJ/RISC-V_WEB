@@ -13,6 +13,7 @@ let runInterval = null;
    INICIO
 ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
+    loadDatapathSVG();
     updateUI();
 
     document.getElementById('btn-step').addEventListener('click', handleStep);
@@ -23,23 +24,55 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ============================================================
+   CARGAR SVG DEL DATAPATH
+============================================================ */
+async function loadDatapathSVG() {
+    try {
+        const response = await fetch('procesador.svg');
+        const svgText = await response.text();
+        
+        const container = document.getElementById('datapath-container');
+        container.innerHTML = svgText;
+        
+        // Ajustar el SVG al contenedor
+        const svg = container.querySelector('svg');
+        if (svg) {
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+            svg.style.position = 'relative';
+            svg.style.zIndex = '2';
+        }
+    } catch (error) {
+        console.error('Error cargando el SVG del datapath:', error);
+    }
+}
+
+/* ============================================================
    STEP
 ============================================================ */
-function handleStep() {
-    const result = cpu.step(updateStageIndicator);
+let isStepInProgress = false;
+
+async function handleStep() {
+    if (isStepInProgress) return;
+    isStepInProgress = true;
+
+    const result = await cpu.stepWithStageDelay(updateStageIndicator, 400);
     if (result) updateUI(result);
+    
+    isStepInProgress = false;
 }
 
 /* ============================================================
    RUN / PAUSE
 ============================================================ */
-function handleRun(e) {
+let isRunning = false;
+
+async function handleRun(e) {
     const btn = e.target.closest('button');
     const span = btn.querySelector('span');
 
-    if (runInterval) {
-        clearInterval(runInterval);
-        runInterval = null;
+    if (isRunning) {
+        isRunning = false;
         span.textContent = "Run";
         btn.classList.remove("active");
         return;
@@ -47,29 +80,32 @@ function handleRun(e) {
 
     btn.classList.add("active");
     span.textContent = "Pause";
+    isRunning = true;
 
-    runInterval = setInterval(() => {
-        if (cpu.state.halted) {
-            clearInterval(runInterval);
-            runInterval = null;
-            btn.classList.remove("active");
-            span.textContent = "Run";
-        } else {
-            const result = cpu.step(updateStageIndicator);
-            if (result) updateUI(result);
-        }
-    }, 600);
+    while (isRunning && !cpu.state.halted) {
+        const result = await cpu.stepWithStageDelay(updateStageIndicator, 300);
+        if (result) updateUI(result);
+        // Pequeña pausa entre instrucciones completas
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    if (cpu.state.halted || !isRunning) {
+        isRunning = false;
+        btn.classList.remove("active");
+        span.textContent = "Run";
+    }
 }
 
 /* ============================================================
    RESET
 ============================================================ */
 function handleReset() {
-    if (runInterval) {
-        clearInterval(runInterval);
-        runInterval = null;
-        document.getElementById('btn-run').querySelector('span').textContent = "Run";
-    }
+    isRunning = false;
+    isStepInProgress = false;
+    
+    const runBtn = document.getElementById('btn-run');
+    runBtn.querySelector('span').textContent = "Run";
+    runBtn.classList.remove('active');
 
     lastDecoded = null;
     cpu.reset();
@@ -123,6 +159,7 @@ document.addEventListener('fullscreenchange', () => {
    STAGE INDICATOR
 ============================================================ */
 function updateStageIndicator(stage) {
+    // Actualizar pills
     document.querySelectorAll('.stage-pill').forEach(el => el.classList.remove('active'));
 
     const ids = {
@@ -135,10 +172,81 @@ function updateStageIndicator(stage) {
 
     const el = document.getElementById(ids[stage]);
     if (el) el.classList.add("active");
+    
+    // Iluminar componentes del datapath
+    illuminateDatapathComponents(stage);
 }
 
 /* ============================================================
-   🔥 ILUMINAR SOLO LOS CAMPOS QUE CAMBIAN
+   ILUMINAR COMPONENTES DEL DATAPATH SEGÚN ETAPA
+============================================================ */
+function illuminateDatapathComponents(stage) {
+    // Limpiar todas las clases active del SVG
+    const svg = document.querySelector('#datapath-container svg');
+    if (!svg) return;
+    
+    svg.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+    
+    // Definir qué componentes se iluminan en cada etapa
+    const stageComponents = {
+        [Stage.FETCH]: [
+            '#pc',
+            '#instr-mem',
+            '#pc-adder',
+            '#path57', '#path58', '#path59', // Líneas de PC
+            'path[id^="bus-pc"]'
+        ],
+        [Stage.DECODE]: [
+            '#instr-mem',
+            '#control-unit',
+            '#registers',
+            '#sign-extend',
+            'path[id^="path50"]',
+            'path[id^="path51"]',
+            'path[id^="imm"]'
+        ],
+        [Stage.EXEC]: [
+            '#alu',
+            '#mux-alu-a',
+            '#registers',
+            '#sign-extend',
+            'path[id^="path3"]',
+            'path[id^="path81"]',
+            '#alu-op'
+        ],
+        [Stage.MEM]: [
+            '#data-mem',
+            '#alu',
+            'path[id^="path78"]', // ALU output
+            'path[id^="path82"]', // Dir output
+            'path[id^="path84"]', // Dir input
+            'path[id^="path80"]', // Input data
+            '#wem'
+        ],
+        [Stage.WB]: [
+            '#mux-wb',
+            '#data-mem',
+            '#registers',
+            'path[id^="alu-reg"]',
+            '#alu2reg',
+            '#wer'
+        ]
+    };
+    
+    // Obtener componentes para la etapa actual
+    const componentsToIlluminate = stageComponents[stage] || [];
+    
+    // Iluminar cada componente
+    componentsToIlluminate.forEach(selector => {
+        const elements = svg.querySelectorAll(selector);
+        elements.forEach(el => {
+            el.classList.add('active');
+        });
+    });
+}
+
+/* ============================================================
+   ILUMINAR SOLO LOS CAMPOS QUE CAMBIAN
 ============================================================ */
 function highlightDecodeOnlyOnChange(decoded) {
     if (!decoded) return;
