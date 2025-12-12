@@ -116,6 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnFullscreen = document.getElementById('btn-fullscreen');
     const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
     const btnCollapseSidebar = document.getElementById('btn-collapse-sidebar');
+    const btnPreloadCollatz = document.getElementById('btn-preload-collatz');
+    const btnPreloadFibonacci = document.getElementById('btn-preload-fibonacci');
 
     if (btnStep) btnStep.addEventListener('click', handleStep);
     if (btnRun) btnRun.addEventListener('click', handleRun);
@@ -124,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnFullscreen) btnFullscreen.addEventListener('click', handleFullscreen);
     if (btnToggleSidebar) btnToggleSidebar.addEventListener('click', toggleSidebar);
     if (btnCollapseSidebar) btnCollapseSidebar.addEventListener('click', toggleSidebar);
+    if (btnPreloadCollatz) btnPreloadCollatz.addEventListener('click', () => loadPresetProgram('collatz'));
+    if (btnPreloadFibonacci) btnPreloadFibonacci.addEventListener('click', () => loadPresetProgram('fibonacci'));
     
     // Configurar selector de formato
     setupFormatSelector();
@@ -1018,6 +1022,70 @@ function handleReset() {
     document.getElementById('memory-last-op').textContent = '--';
 
     document.querySelectorAll('.stage-pill').forEach(el => el.classList.remove('active'));
+}
+
+/* ============================================================
+   LOAD PRESET PROGRAMS
+============================================================ */
+const PRESET_PROGRAMS = {
+    collatz: `addi x5, x0, 100
+addi x7, x0, 0
+addi x6, x0, 256      
+loop:
+    sw x5, 0(x6)        
+    addi x6, x6, 4      
+    addi x7, x7, 1     
+    addi x28, x0, 1
+    beq x5, x28, fin    
+    addi x29, x0, 1
+    and  x30, x5, x29
+    beq  x30, x0, par   
+    slli x31, x5, 1
+    add  x31, x31, x5
+    addi x5, x31, 1
+    beq x0, x0, loop
+par:
+    srli x5, x5, 1
+    beq x0, x0, loop
+fin:
+    sw x7, 0(x6)    
+    addi x0, x0, 0`,
+
+    fibonacci: `main:
+    addi x10, x0, 1
+    addi x11, x0, 1
+    addi x7, x0, 0
+    addi x5, x0, 500
+    addi x6, x0, 252
+    addi x6, x6, 4
+    sw   x10, 0(x6)      
+    sw   x11, 0(x6)     
+loop:
+    add  x12, x10, x11
+    bge  x12, x5, fin
+    sw   x12, 0(x6)
+    addi x6, x6, 4
+    addi x7, x7, 1
+    add  x10, x11, x0
+    add  x11, x12, x0
+    beq  x0, x0, loop
+fin:
+    sw   x7, 0(x6)     
+    addi x0, x0, 0`
+};
+
+function loadPresetProgram(preset) {
+    const programInput = document.getElementById('program-input');
+    if (!programInput) return;
+    
+    const program = PRESET_PROGRAMS[preset];
+    if (!program) {
+        showToast(`Programa "${preset}" no encontrado`, "error");
+        return;
+    }
+    
+    programInput.value = program;
+    showToast(`Programa ${preset.charAt(0).toUpperCase() + preset.slice(1)} cargado`, "success");
 }
 
 /* ============================================================
