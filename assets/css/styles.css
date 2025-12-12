@@ -43,7 +43,7 @@
     --font-sans: 'Inter', sans-serif;
     
     /* Dimensiones */
-    --sidebar-width: 420px;
+    --sidebar-width: 560px;
     --sidebar-collapsed: 0px;
     --header-height: 64px;
     
@@ -328,7 +328,8 @@ body {
 
 .datapath-container {
     flex: 1;
-    width: 1200px;
+    width: 960px;
+    max-width: 80vw;
     position: relative;
     background: #07182e;
     border-radius: 20px;
