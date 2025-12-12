@@ -9,6 +9,7 @@ const cpu = new RISCVProcessor();
 let runInterval = null;
 let displayFormat = 'dec'; // 'hex', 'dec', 'bin'
 let executionDelay = 600; // Delay en ms entre ciclos de ejecución
+let currentMemoryView = 'grid'; // 'grid' o 'table'
 
 // ABI names para los registros
 const ABI_NAMES = [
@@ -169,14 +170,12 @@ function toggleSidebar() {
         collapseBtn.querySelector('svg').style.transform = 'rotate(180deg)';
     } else {
         collapseBtn.querySelector('svg').style.transform = 'rotate(0deg)';
->>>>>>> 016ebd5e09ffe06f278c7cfd79b5d225fbd755f3
     }
 }
 
 /* ============================================================
    STEP
 ============================================================ */
-<<<<<<< HEAD
 let isStepInProgress = false;
 
 async function handleStep() {
@@ -184,16 +183,8 @@ async function handleStep() {
     isStepInProgress = true;
 
     const result = await cpu.stepWithStageDelay(updateStageIndicator, 400);
-    if (result) updateUI(result);
-    
-    isStepInProgress = false;
-=======
-function handleStep() {
-    const result = cpu.step(updateStageIndicator);
     if (result) {
         // Detectar si la instrucción accede a memoria
-        // LW (Load Word): opcode 0x03
-        // SW (Store Word): opcode 0x23
         if (result.decoded.opcode === 0x03 || result.decoded.opcode === 0x23) {
             const addrIndex = (result.alu_res >>> 2) & 0x1f;
             const operation = result.decoded.opcode === 0x03 ? 'READ' : 'WRITE';
@@ -201,7 +192,8 @@ function handleStep() {
         }
         updateUI(result);
     }
->>>>>>> 016ebd5e09ffe06f278c7cfd79b5d225fbd755f3
+    
+    isStepInProgress = false;
 }
 
 /* ============================================================
@@ -224,32 +216,22 @@ async function handleRun(e) {
     span.textContent = "Pause";
     isRunning = true;
 
-<<<<<<< HEAD
-    while (isRunning && !cpu.state.halted) {
-        const result = await cpu.stepWithStageDelay(updateStageIndicator, 300);
-        if (result) updateUI(result);
-        // Pequeña pausa entre instrucciones completas
-        await new Promise(resolve => setTimeout(resolve, 200));
-    }
+    async function runLoop() {
+        while (isRunning && !cpu.state.halted) {
+            const stageDelay = Math.min(executionDelay / 5, 300);
+            const result = await cpu.stepWithStageDelay(updateStageIndicator, stageDelay);
+            if (result) updateUI(result);
+            await new Promise(resolve => setTimeout(resolve, executionDelay / 5));
+        }
 
-    if (cpu.state.halted || !isRunning) {
-        isRunning = false;
-        btn.classList.remove("active");
-        span.textContent = "Run";
-    }
-=======
-    runInterval = setInterval(() => {
-        if (cpu.state.halted) {
-            clearInterval(runInterval);
-            runInterval = null;
+        if (cpu.state.halted || !isRunning) {
+            isRunning = false;
             btn.classList.remove("active");
             span.textContent = "Run";
-        } else {
-            const result = cpu.step(updateStageIndicator);
-            if (result) updateUI(result);
         }
-    }, executionDelay);
->>>>>>> 016ebd5e09ffe06f278c7cfd79b5d225fbd755f3
+    }
+    
+    runLoop();
 }
 
 /* ============================================================
@@ -373,7 +355,6 @@ function updateStageIndicator(stage) {
     illuminateDatapathComponents(stage);
 }
 
-<<<<<<< HEAD
 /* ============================================================
    ILUMINAR COMPONENTES DEL DATAPATH SEGÚN ETAPA
 ============================================================ */
@@ -390,7 +371,7 @@ function illuminateDatapathComponents(stage) {
             '#pc',
             '#instr-mem',
             '#pc-adder',
-            '#path57', '#path58', '#path59', // Líneas de PC
+            '#path57', '#path58', '#path59',
             'path[id^="bus-pc"]'
         ],
         [Stage.DECODE]: [
@@ -414,10 +395,10 @@ function illuminateDatapathComponents(stage) {
         [Stage.MEM]: [
             '#data-mem',
             '#alu',
-            'path[id^="path78"]', // ALU output
-            'path[id^="path82"]', // Dir output
-            'path[id^="path84"]', // Dir input
-            'path[id^="path80"]', // Input data
+            'path[id^="path78"]',
+            'path[id^="path82"]',
+            'path[id^="path84"]',
+            'path[id^="path80"]',
             '#wem'
         ],
         [Stage.WB]: [
@@ -445,9 +426,6 @@ function illuminateDatapathComponents(stage) {
 /* ============================================================
    ILUMINAR SOLO LOS CAMPOS QUE CAMBIAN
 ============================================================ */
-=======
-
->>>>>>> 016ebd5e09ffe06f278c7cfd79b5d225fbd755f3
 function highlightDecodeOnlyOnChange(decoded) {
     if (!decoded) return;
 
@@ -848,7 +826,6 @@ function renderRegisters() {
 let memoryAccessCount = 0;
 let lastMemoryAddr = null;
 let lastMemoryOp = '--';
-let currentMemoryView = 'grid';
 
 function renderMemory() {
     renderMemoryGrid();
