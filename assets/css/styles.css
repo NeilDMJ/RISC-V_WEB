@@ -215,6 +215,57 @@ body {
     overflow: hidden;
 }
 
+/* ============================================================
+   MODULE VISOR (hover tooltip)
+============================================================ */
+.module-visor {
+    position: fixed;
+    z-index: 10001;
+    min-width: 240px;
+    max-width: 360px;
+    background: rgba(17, 24, 39, 0.96);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+}
+
+.module-visor-title {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.module-visor-body {
+    display: grid;
+    gap: 6px;
+}
+
+.module-visor-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.module-visor-k {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.module-visor-v {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent-primary);
+    white-space: nowrap;
+}
+
 .datapath-toolbar {
     position: absolute;
     top: 1rem;

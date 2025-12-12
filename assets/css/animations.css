@@ -230,4 +230,131 @@
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
->>>>>>> 016ebd5e09ffe06f278c7cfd79b5d225fbd755f3
+
+/* ============================================================
+   DATAPATH (SVG) — NEON/TECH (sutil-profesional)
+   Nota: no mueve geometría; solo estilos/animaciones.
+============================================================ */
+
+#datapath-container svg {
+    /* Afinar render de strokes */
+    shape-rendering: geometricPrecision;
+}
+
+/* Buses/cables */
+#datapath-container svg path.dp-wire {
+    transition: stroke 180ms ease, filter 180ms ease, opacity 180ms ease;
+}
+
+/* Hover: iluminar cualquier cable aunque no esté 'active' */
+#datapath-container svg path.dp-wire.dp-wire-hover {
+    stroke-opacity: 1 !important;
+    stroke-width: 3.4 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    filter:
+        drop-shadow(0 0 8px rgba(255, 255, 255, 0.18))
+        drop-shadow(0 0 16px var(--accent-glow))
+        !important;
+}
+
+#datapath-container svg path.dp-wire.active {
+    /* Mantener el color base del SVG, pero mejorar el “neón” */
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    stroke-dasharray: 10 7 !important;
+    animation: dp-dash-flow 1.35s ease-in-out infinite !important;
+    filter:
+        drop-shadow(0 0 6px var(--accent-glow))
+        drop-shadow(0 0 14px rgba(59, 130, 246, 0.18))
+        !important;
+}
+
+/* Etiqueta de valor (decimal) viajando sobre el cable */
+#datapath-container svg .dp-value-tag {
+    filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+
+#datapath-container svg .dp-value-tag .dp-value-bg {
+    fill: var(--bg-panel);
+    fill-opacity: 0.92;
+    stroke: var(--accent-primary);
+    stroke-opacity: 0.55;
+    stroke-width: 1;
+}
+
+#datapath-container svg .dp-value-tag .dp-value-text {
+    fill: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--bg-dark);
+    stroke-opacity: 0.55;
+    stroke-width: 2px;
+}
+
+/* Módulos (hover 3D) */
+#datapath-container svg .dp-module {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 160ms ease, filter 160ms ease, opacity 160ms ease;
+    will-change: transform, filter;
+}
+
+#datapath-container svg .dp-module.dp-hovered {
+    opacity: 0.98;
+    filter:
+        drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 0 16px var(--accent-glow));
+    transform:
+        perspective(900px)
+        rotateX(var(--dp-tilt-x, 0deg))
+        rotateY(var(--dp-tilt-y, 0deg))
+        scale(1.045);
+}
+
+
+@keyframes dp-dash-flow {
+    0% { stroke-dashoffset: 0; opacity: 0.92; }
+    50% { stroke-dashoffset: 16; opacity: 1; }
+    100% { stroke-dashoffset: 32; opacity: 0.92; }
+}
+
+/* Paquetes (punto viajando) */
+#datapath-container svg .dp-packet {
+    fill: var(--accent-primary);
+    opacity: 0.9;
+    filter:
+        drop-shadow(0 0 4px var(--accent-glow))
+        drop-shadow(0 0 10px rgba(59, 130, 246, 0.22));
+}
+
+#datapath-container svg .dp-packet.dp-packet-soft {
+    opacity: 0.65;
+}
+
+/* Componentes (módulos) */
+#datapath-container svg .dp-module.active {
+    animation: dp-module-breath 1.4s ease-in-out infinite !important;
+    filter:
+        drop-shadow(0 0 10px rgba(59, 130, 246, 0.18))
+        drop-shadow(0 0 20px rgba(59, 130, 246, 0.10))
+        !important;
+}
+
+@keyframes dp-module-breath {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.92; }
+}
+
+/* “Ping” corto para eventos (write-back, mem write, etc.) */
+#datapath-container svg .dp-ping {
+    animation: dp-ping 320ms ease-out 1;
+}
+
+@keyframes dp-ping {
+    0% { filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+    40% { filter: drop-shadow(0 0 14px rgba(59, 130, 246, 0.35)); }
+    100% { filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+}

@@ -12,6 +12,14 @@ let executionDelay = 600; // Delay en ms entre ciclos de ejecución
 let currentMemoryView = 'grid'; // 'grid' o 'table'
 let lastStepResult = null; // Almacenar último resultado para tooltips
 
+// Animación datapath (SVG)
+let dpAnim = {
+    svg: null,
+    packetLayer: null,
+    valueLayer: null,
+    rafIds: new Set(),
+};
+
 // ABI names para los registros
 const ABI_NAMES = [
     'zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2',
@@ -27,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDatapathSVG();
     updateUI();
     createBusTooltip();
+    createModuleVisor();
 
     // Event listeners seguros (verifica que el elemento existe antes de agregar listener)
     const btnStep = document.getElementById('btn-step');
@@ -75,11 +84,178 @@ async function loadDatapathSVG() {
             svg.style.zIndex = '2';
         }
         
-        // Configurar tooltips para buses después de cargar SVG
+        // Preparar clases para animaciones (no mueve geometría)
+        prepareDatapathAnimations();
+
+        // Configurar tooltips/hover para TODOS los cables después de marcar dp-wire
         setupBusTooltips();
+
+        // Hover 3D + visor de contenido por módulo
+        setupModuleHoverVisor();
     } catch (error) {
         console.error('Error cargando el SVG del datapath:', error);
     }
+}
+
+function prepareDatapathAnimations() {
+    const svg = document.querySelector('#datapath-container svg');
+    if (!svg) return;
+
+    dpAnim.svg = svg;
+
+    // Capa encima para paquetes (circles). No altera posiciones existentes.
+    let layer = svg.querySelector('g#dp-packets');
+    if (!layer) {
+        layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        layer.setAttribute('id', 'dp-packets');
+        layer.setAttribute('pointer-events', 'none');
+        // Insertar al final para que quede encima
+        svg.appendChild(layer);
+    }
+    dpAnim.packetLayer = layer;
+
+    // Capa encima para etiquetas numéricas (pill + texto). No altera posiciones.
+    let vlayer = svg.querySelector('g#dp-values');
+    if (!vlayer) {
+        vlayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        vlayer.setAttribute('id', 'dp-values');
+        vlayer.setAttribute('pointer-events', 'none');
+        // Encima de paquetes para legibilidad
+        svg.appendChild(vlayer);
+    }
+    dpAnim.valueLayer = vlayer;
+
+    // Marcar cables (paths) para aplicar estilos externos
+    const wireSelector = 'path[id^="path"], path[id^="bus"], path[id^="imm"], path[id^="branch"], path[id^="alu"], path[id^="wer"], path[id^="wem"], path[id^="br-neg"]';
+    svg.querySelectorAll(wireSelector).forEach(p => p.classList.add('dp-wire'));
+
+    // Marcar módulos para aplicar “breathing glow” cuando estén activos
+    const moduleIds = [
+        'pc', 'instr-mem', 'control-unit', 'registers', 'data-mem',
+        'alu', 'sign-extend', 'mux-wb', 'mux-alu-a', 'pc-adder'
+    ];
+    moduleIds.forEach(id => {
+        const el = svg.querySelector('#' + CSS.escape(id));
+        if (el) el.classList.add('dp-module');
+    });
+}
+
+function spawnPacketOnPath(pathEl, { durationMs = 420, radius = 3.2, soft = false } = {}) {
+    if (!dpAnim.svg || !dpAnim.packetLayer || !pathEl) return;
+    if (typeof pathEl.getTotalLength !== 'function') return;
+
+    let totalLen = 0;
+    try {
+        totalLen = pathEl.getTotalLength();
+    } catch {
+        return;
+    }
+    if (!Number.isFinite(totalLen) || totalLen <= 1) return;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', String(radius));
+    circle.classList.add('dp-packet');
+    if (soft) circle.classList.add('dp-packet-soft');
+    dpAnim.packetLayer.appendChild(circle);
+
+    const start = performance.now();
+    const raf = (now) => {
+        const t = Math.min(1, (now - start) / durationMs);
+        const eased = 1 - Math.pow(1 - t, 2); // easeOutQuad
+        const p = pathEl.getPointAtLength(totalLen * eased);
+        circle.setAttribute('cx', String(p.x));
+        circle.setAttribute('cy', String(p.y));
+        if (t < 1) {
+            const id = requestAnimationFrame(raf);
+            dpAnim.rafIds.add(id);
+        } else {
+            circle.remove();
+        }
+    };
+
+    const id = requestAnimationFrame(raf);
+    dpAnim.rafIds.add(id);
+}
+
+function formatDecimal32(value) {
+    if (value === null || value === undefined) return null;
+    const u = value >>> 0;
+    return String(toInt32(u));
+}
+
+function spawnValueTagOnPath(pathEl, value, { durationMs = 520, yOffset = -10 } = {}) {
+    if (!dpAnim.svg || !dpAnim.valueLayer || !pathEl) return;
+    if (typeof pathEl.getTotalLength !== 'function') return;
+
+    const label = formatDecimal32(value);
+    if (!label) return;
+
+    let totalLen = 0;
+    try {
+        totalLen = pathEl.getTotalLength();
+    } catch {
+        return;
+    }
+    if (!Number.isFinite(totalLen) || totalLen <= 1) return;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.classList.add('dp-value-tag');
+
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.classList.add('dp-value-bg');
+    bg.setAttribute('rx', '6');
+    bg.setAttribute('ry', '6');
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.classList.add('dp-value-text');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.textContent = label;
+
+    g.appendChild(bg);
+    g.appendChild(text);
+    dpAnim.valueLayer.appendChild(g);
+
+    // Medir y ajustar caja
+    let bb;
+    try {
+        bb = text.getBBox();
+    } catch {
+        bb = { x: 0, y: 0, width: 10, height: 10 };
+    }
+    const padX = 8;
+    const padY = 5;
+    const w = Math.max(18, bb.width + padX * 2);
+    const h = Math.max(16, bb.height + padY * 2);
+    bg.setAttribute('width', String(w));
+    bg.setAttribute('height', String(h));
+    bg.setAttribute('x', String(-w / 2));
+    bg.setAttribute('y', String(-h / 2));
+    text.setAttribute('x', '0');
+    text.setAttribute('y', '0');
+
+    const start = performance.now();
+    const raf = (now) => {
+        const t = Math.min(1, (now - start) / durationMs);
+        const eased = 1 - Math.pow(1 - t, 2);
+        const p = pathEl.getPointAtLength(totalLen * eased);
+        g.setAttribute('transform', `translate(${p.x}, ${p.y + yOffset})`);
+        if (t < 1) {
+            requestAnimationFrame(raf);
+        } else {
+            g.remove();
+        }
+    };
+    requestAnimationFrame(raf);
+}
+
+function datapathPing(selector) {
+    const svg = dpAnim.svg;
+    if (!svg) return;
+    const el = svg.querySelector(selector);
+    if (!el) return;
+    el.classList.add('dp-ping');
+    setTimeout(() => el.classList.remove('dp-ping'), 350);
 }
 
 /* ============================================================
@@ -110,66 +286,401 @@ function createBusTooltip() {
     document.body.appendChild(tooltip);
 }
 
+/* ============================================================
+   MODULE VISOR (hover)
+============================================================ */
+let moduleVisorState = {
+    visible: false,
+    moduleId: null,
+    x: 0,
+    y: 0,
+};
+
+function isFlatHoverModuleId(id) {
+    return id === 'sign-extend' || id === 'mux-wb' || id === 'mux-alu-a';
+}
+
+function createModuleVisor() {
+    if (document.getElementById('module-visor')) return;
+
+    const visor = document.createElement('div');
+    visor.id = 'module-visor';
+    visor.className = 'module-visor';
+    visor.style.display = 'none';
+    visor.innerHTML = `
+        <div class="module-visor-title" id="module-visor-title">--</div>
+        <div class="module-visor-body" id="module-visor-body"></div>
+    `;
+    document.body.appendChild(visor);
+}
+
+function setupModuleHoverVisor() {
+    const svg = document.querySelector('#datapath-container svg');
+    if (!svg) return;
+
+    if (!document.getElementById('module-visor')) createModuleVisor();
+
+    const modules = svg.querySelectorAll('.dp-module');
+    modules.forEach(mod => {
+        mod.style.cursor = 'pointer';
+
+        mod.addEventListener('pointerenter', (e) => {
+            moduleVisorState.visible = true;
+            moduleVisorState.moduleId = mod.id;
+            moduleVisorState.x = e.clientX;
+            moduleVisorState.y = e.clientY;
+            mod.classList.remove('dp-hovered');
+            // Para módulos delgados, NO aplicar ningún efecto 3D/hover visual.
+            // Solo mostrar el visor (card).
+            if (!isFlatHoverModuleId(mod.id)) mod.classList.add('dp-hovered');
+            showModuleVisor();
+            moveModuleVisor(e);
+            refreshModuleVisor();
+        });
+
+        mod.addEventListener('pointermove', (e) => {
+            if (!moduleVisorState.visible || moduleVisorState.moduleId !== mod.id) return;
+            moduleVisorState.x = e.clientX;
+            moduleVisorState.y = e.clientY;
+            moveModuleVisor(e);
+            updateModuleTilt(mod, e);
+        });
+
+        mod.addEventListener('pointerleave', () => {
+            moduleVisorState.visible = false;
+            moduleVisorState.moduleId = null;
+            mod.classList.remove('dp-hovered');
+            mod.style.removeProperty('--dp-tilt-x');
+            mod.style.removeProperty('--dp-tilt-y');
+            hideModuleVisor();
+        });
+    });
+}
+
+function showModuleVisor() {
+    const visor = document.getElementById('module-visor');
+    if (!visor) return;
+    visor.style.display = 'block';
+}
+
+function hideModuleVisor() {
+    const visor = document.getElementById('module-visor');
+    if (!visor) return;
+    visor.style.display = 'none';
+}
+
+function moveModuleVisor(e) {
+    const visor = document.getElementById('module-visor');
+    if (!visor) return;
+
+    const pad = 14;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // posicion inicial
+    let left = e.clientX + 14;
+    let top = e.clientY + 14;
+
+    // medir para clamp
+    visor.style.left = '0px';
+    visor.style.top = '0px';
+    const r = visor.getBoundingClientRect();
+
+    if (left + r.width + pad > vw) left = Math.max(pad, e.clientX - r.width - 14);
+    if (top + r.height + pad > vh) top = Math.max(pad, e.clientY - r.height - 14);
+
+    visor.style.left = `${left}px`;
+    visor.style.top = `${top}px`;
+}
+
+function updateModuleTilt(mod, e) {
+    if (!mod || typeof mod.getBoundingClientRect !== 'function') return;
+
+    // Componentes delgados: evitar tilt 3D (se distorsiona visualmente)
+    if (isFlatHoverModuleId(mod.id)) return;
+
+    const rect = mod.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const dx = rect.width > 0 ? (e.clientX - cx) / (rect.width / 2) : 0;
+    const dy = rect.height > 0 ? (e.clientY - cy) / (rect.height / 2) : 0;
+
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const ndx = clamp(dx, -1, 1);
+    const ndy = clamp(dy, -1, 1);
+
+    // tilt suave
+    const tiltY = ndx * 10; // rotateY
+    const tiltX = -ndy * 8; // rotateX
+
+    mod.style.setProperty('--dp-tilt-x', `${tiltX.toFixed(2)}deg`);
+    mod.style.setProperty('--dp-tilt-y', `${tiltY.toFixed(2)}deg`);
+}
+
+function fmt32(v) {
+    if (v === null || v === undefined) return '--';
+    const u = (v >>> 0);
+    return `${toHex32(u)} (${toInt32(u)})`;
+}
+
+function fmtReg(n) {
+    if (n === null || n === undefined) return '--';
+    const abi = ABI_NAMES[n] ? `/${ABI_NAMES[n]}` : '';
+    return `x${n}${abi}`;
+}
+
+function getModuleVisorData(moduleId) {
+    const sr = lastStepResult;
+    const d = sr?.decoded;
+    const c = sr?.ctrl;
+
+    const pc_before = sr?.pc_before ?? cpu.state.pc;
+    const pc_after = sr?.pc_after ?? cpu.state.pc;
+
+    const common = {
+        pc_before,
+        pc_after,
+        instr: sr?.instr,
+    };
+
+    switch (moduleId) {
+        case 'pc':
+            return {
+                title: 'PC',
+                rows: [
+                    ['PC (before)', fmt32(common.pc_before)],
+                    ['PC + 4', fmt32((common.pc_before + 4) >>> 0)],
+                    ['PC (after)', fmt32(common.pc_after)],
+                ]
+            };
+
+        case 'pc-adder':
+            return {
+                title: 'PC + 4',
+                rows: [
+                    ['PC', fmt32(common.pc_before)],
+                    ['PC + 4', fmt32((common.pc_before + 4) >>> 0)],
+                ]
+            };
+
+        case 'instr-mem': {
+            const instr = common.instr ?? (() => {
+                const wi = (cpu.state.pc >>> 2);
+                if (wi >= cpu.state.instrMem.length) return null;
+                return cpu.state.instrMem[wi] >>> 0;
+            })();
+            const wordIndex = (common.pc_before >>> 2);
+            return {
+                title: 'Instruction Memory',
+                rows: [
+                    ['PC', fmt32(common.pc_before)],
+                    ['Index', `${wordIndex}`],
+                    ['Instr', instr == null ? '--' : toHex32(instr)],
+                    ['opcode', d ? `0x${d.opcode.toString(16).toUpperCase().padStart(2, '0')}` : '--'],
+                ]
+            };
+        }
+
+        case 'control-unit':
+            return {
+                title: 'Control Unit',
+                rows: [
+                    ['opcode', d ? `0x${d.opcode.toString(16).toUpperCase().padStart(2, '0')}` : '--'],
+                    ['funct3', d ? `0x${d.funct3.toString(16).toUpperCase()}` : '--'],
+                    ['funct7', d ? `0x${d.funct7.toString(16).toUpperCase().padStart(2, '0')}` : '--'],
+                    ['alu_op', c ? `0x${c.alu_op.toString(16).toUpperCase()}` : '--'],
+                    ['alu_src', c ? String(c.alu_src) : '--'],
+                    ['alu2reg', c ? String(c.alu2reg) : '--'],
+                    ['wem', c ? String(c.wem) : '--'],
+                    ['branch', c ? String(c.branch) : '--'],
+                    ['branch_ne', c ? String(c.branch_ne) : '--'],
+                ]
+            };
+
+        case 'sign-extend':
+            return {
+                title: 'Sign Extend',
+                rows: [
+                    ['immType', d?.immType ?? '--'],
+                    ['imm', d ? fmt32(d.imm >>> 0) : '--'],
+                ]
+            };
+
+        case 'registers': {
+            const rs1 = d?.rs1;
+            const rs2 = d?.rs2;
+            const rd = d?.rd;
+            const rs1v = (sr?.rs1_val ?? (rs1 != null ? (cpu.state.regs[rs1] >>> 0) : null));
+            const rs2v = (sr?.rs2_val ?? (rs2 != null ? (cpu.state.regs[rs2] >>> 0) : null));
+
+            const wb = sr?.wb_we ? `${fmtReg(sr.wb_rd)} = ${fmt32(sr.wb_val)}` : '--';
+            return {
+                title: 'Register File',
+                rows: [
+                    ['rs1', rs1 == null ? '--' : fmtReg(rs1)],
+                    ['rs1_val', fmt32(rs1v)],
+                    ['rs2', rs2 == null ? '--' : fmtReg(rs2)],
+                    ['rs2_val', fmt32(rs2v)],
+                    ['rd', rd == null ? '--' : fmtReg(rd)],
+                    ['writeback', wb],
+                ]
+            };
+        }
+
+        case 'alu':
+            return {
+                title: 'ALU',
+                rows: [
+                    ['A (rs1)', fmt32(sr?.rs1_val)],
+                    ['B', fmt32(sr?.alu_b)],
+                    ['alu_op', c ? `0x${c.alu_op.toString(16).toUpperCase()}` : '--'],
+                    ['result', fmt32(sr?.alu_res)],
+                ]
+            };
+
+        case 'data-mem': {
+            const addr = sr?.mem_addr ?? sr?.alu_res;
+            const idx = addr != null ? ((addr >>> 2) & 0x1f) : null;
+            const memVal = idx != null ? (cpu.state.dataMem[idx] >>> 0) : null;
+
+            let op = '--';
+            if (d?.opcode === 0x03) op = 'LOAD';
+            if (d?.opcode === 0x23 || c?.wem) op = 'STORE';
+
+            return {
+                title: 'Data Memory',
+                rows: [
+                    ['op', op],
+                    ['addr', fmt32(addr)],
+                    ['index', idx == null ? '--' : String(idx)],
+                    ['write_data', op === 'STORE' ? fmt32(sr?.rs2_val) : '--'],
+                    ['read_data', op === 'LOAD' ? fmt32(sr?.mem_data) : '--'],
+                    ['mem[index]', fmt32(memVal)],
+                ]
+            };
+        }
+
+        default:
+            return {
+                title: moduleId || 'Module',
+                rows: [
+                    ['PC', fmt32(cpu.state.pc)],
+                    ['Cycle', String(cpu.state.cycle)],
+                ]
+            };
+    }
+}
+
+function refreshModuleVisor() {
+    if (!moduleVisorState.visible || !moduleVisorState.moduleId) return;
+    const visor = document.getElementById('module-visor');
+    const titleEl = document.getElementById('module-visor-title');
+    const bodyEl = document.getElementById('module-visor-body');
+    if (!visor || !titleEl || !bodyEl) return;
+
+    const data = getModuleVisorData(moduleVisorState.moduleId);
+    titleEl.textContent = data.title;
+
+    bodyEl.innerHTML = data.rows.map(([k, v]) => {
+        const safeK = String(k);
+        const safeV = String(v);
+        return `<div class="module-visor-row"><span class="module-visor-k">${safeK}</span><code class="module-visor-v">${safeV}</code></div>`;
+    }).join('');
+}
+
 function setupBusTooltips() {
     const svg = document.querySelector('#datapath-container svg');
     if (!svg) return;
     
-    // Seleccionar todos los buses/paths
-    const buses = svg.querySelectorAll('path[id^="path"], path[id^="bus"], path[id^="imm"], path[id^="alu"]');
+    // Seleccionar todos los cables/buses relevantes (mismo set que se anima como dp-wire)
+    const wireSelector = 'path[id^="path"], path[id^="bus"], path[id^="imm"], path[id^="branch"], path[id^="alu"], path[id^="wer"], path[id^="wem"], path[id^="br-neg"]';
+    const buses = svg.querySelectorAll(wireSelector);
     const tooltip = document.getElementById('bus-tooltip');
     if (!tooltip) createBusTooltip();
     
     buses.forEach(bus => {
-        bus.addEventListener('mouseenter', (e) => showBusTooltip(e, bus));
-        bus.addEventListener('mousemove', (e) => moveBusTooltip(e));
-        bus.addEventListener('mouseleave', () => hideBusTooltip());
+        // Asegurar clase base para estilos
+        bus.classList.add('dp-wire');
+
+        bus.addEventListener('pointerenter', (e) => {
+            bus.classList.add('dp-wire-hover');
+            showBusTooltip(e, bus);
+        });
+        bus.addEventListener('pointermove', (e) => moveBusTooltip(e));
+        bus.addEventListener('pointerleave', () => {
+            bus.classList.remove('dp-wire-hover');
+            hideBusTooltip();
+        });
         bus.style.cursor = 'pointer';
     });
 }
 
-function getBusValue(busId) {
-    if (!lastStepResult) return null;
-    
-    const { decoded, alu_res, rs1_val, rs2_val, mem_data } = lastStepResult;
-    const regs = cpu.state.registers;
+function getBusValue(busId, stepResultOverride = null) {
+    const sr = stepResultOverride || lastStepResult;
+    if (!sr) {
+        return { label: busId, value: null, hint: 'Ejecuta Step/Run para ver datos' };
+    }
+
+    const decoded = sr.decoded;
+    const ctrl = sr.ctrl;
+    const alu_res = sr.alu_res;
+    const rs1_val = sr.rs1_val;
+    const rs2_val = sr.rs2_val;
+    const mem_data = sr.mem_data;
+    const pc_before = sr.pc_before;
     
     // Mapeo de buses a valores
     const busMap = {
         // Buses PC
-        'bus-pc-im': { label: 'PC → Instruction Memory', value: cpu.state.pc },
-        'bus-pc-inc': { label: 'PC → PC+4', value: cpu.state.pc },
-        'path57': { label: 'PC Loop', value: cpu.state.pc },
-        'path58': { label: 'PC Increment', value: cpu.state.pc + 4 },
-        'path59': { label: 'PC+4 Result', value: cpu.state.pc + 4 },
+        'bus-pc-im': { label: 'PC → Instruction Memory', value: pc_before, src: 'pc_before' },
+        'bus-pc-inc': { label: 'PC → PC+4', value: pc_before, src: 'pc_before' },
+        'path57': { label: 'PC Loop', value: pc_before, src: 'pc_before' },
+        'path58': { label: 'PC Increment', value: (pc_before + 4) >>> 0, src: 'pc_before + 4' },
+        'path59': { label: 'PC+4 Result', value: (pc_before + 4) >>> 0, src: 'pc_before + 4' },
         
         // Inmediatos
-        'imm(11:15)': { label: 'Immediate [11:15]', value: decoded?.imm },
-        'imm(4:0)': { label: 'Immediate [4:0]', value: decoded?.imm },
-        'imm-rd': { label: 'Immediate → RD', value: decoded?.imm },
+        'imm(11:15)': { label: 'Immediate [11:15]', value: decoded?.imm, src: 'decoded.imm' },
+        'imm(4:0)': { label: 'Immediate [4:0]', value: decoded?.imm, src: 'decoded.imm' },
+        'imm-rd': { label: 'Immediate → RD', value: decoded?.imm, src: 'decoded.imm' },
         
-        // Registro fuente
-        'path50': { label: 'RS1 Index', value: decoded?.rs1 },
-        'path51': { label: 'RS2 Index', value: decoded?.rs2 },
-        'path90': { label: 'RS1 Data', value: rs1_val },
-        'path92': { label: 'RS2 Data (ALU)', value: rs2_val },
+        // Señales hacia/desde banco de registros
+        // Nota: algunos IDs del SVG no están nombrados como rs1/rs2/rd; aquí se mapean según el uso.
+        'path50': { label: 'RS1 (reg index)', value: decoded?.rs1, src: 'decoded.rs1' },
+        // Ajuste solicitado: este cable corresponde a RD (no RS2)
+        'path51': { label: 'RD (reg index)', value: decoded?.rd, src: 'decoded.rd' },
+        // Ajuste solicitado: path89 es RS2 (dato)
+        'path89': { label: 'RS2 DATA', value: rs2_val, src: 'rs2_val' },
+        'path90': { label: 'RS1 DATA', value: rs1_val, src: 'rs1_val' },
+        'path92': { label: 'RS2 DATA (ALU)', value: rs2_val, src: 'rs2_val' },
         
         // ALU
-        'path81': { label: 'ALU Input A', value: rs1_val },
-        'path3': { label: 'ALU Input B', value: rs2_val || decoded?.imm },
-        'path78': { label: 'ALU Result', value: alu_res },
-        'alu-reg(0)': { label: 'ALU → Registers', value: alu_res },
+        'path81': { label: 'ALU Input A', value: rs1_val, src: 'rs1_val' },
+        'path3': { label: 'ALU Input B', value: sr.alu_b, src: 'alu_b' },
+        'path78': { label: 'ALU Result', value: alu_res, src: 'alu_res' },
+        'alu-reg(0)': { label: 'ALU → Registers', value: alu_res, src: 'alu_res' },
         
         // Memoria de datos
-        'path82': { label: 'Memory Address', value: alu_res },
-        'path84': { label: 'Write Data → Memory', value: rs2_val },
-        'path80': { label: 'Read Data from Memory', value: mem_data },
-        'path86': { label: 'Memory → MUX', value: mem_data },
+        'path82': { label: 'Memory Address', value: alu_res, src: 'alu_res' },
+        'path84': { label: 'Write Data → Memory', value: rs2_val, src: 'rs2_val' },
+        'path80': { label: 'Read Data from Memory', value: mem_data, src: 'mem_data' },
+        'path86': { label: 'Memory → MUX', value: mem_data, src: 'mem_data' },
         
         // Write-back
-        'path91': { label: 'Data → Register File', value: mem_data || alu_res }
+        'path91': { label: 'Data → Register File', value: sr.wb_val, src: 'wb_val' },
+
+        // Señales de control (paths con id directo)
+        'alu-op': { label: 'ALUOp', value: ctrl?.alu_op, src: 'ctrl.alu_op' },
+        'alu-src': { label: 'ALUSrc', value: ctrl?.alu_src, src: 'ctrl.alu_src' },
+        'alu2reg': { label: 'ALU2Reg', value: ctrl?.alu2reg, src: 'ctrl.alu2reg' },
+        'wem': { label: 'MemWrite (WEM)', value: ctrl?.wem, src: 'ctrl.wem' },
+        'wer': { label: 'RegWrite (WER)', value: sr.wb_we ? 1 : 0, src: 'wb_we' },
+        'branch': { label: 'Branch', value: ctrl?.branch, src: 'ctrl.branch' },
+        'br-neg': { label: 'BranchNE', value: ctrl?.branch_ne, src: 'ctrl.branch_ne' }
     };
-    
-    return busMap[busId] || null;
+
+    // Fallback: mostrar al menos el ID del bus aunque no haya mapeo
+    return busMap[busId] || { label: busId, value: null };
 }
 
 function showBusTooltip(event, bus) {
@@ -177,10 +688,6 @@ function showBusTooltip(event, bus) {
     if (!tooltip) return;
     
     const busValue = getBusValue(bus.id);
-    if (!busValue) {
-        tooltip.style.display = 'none';
-        return;
-    }
     
     let valueStr;
     if (busValue.value === undefined || busValue.value === null) {
@@ -190,9 +697,13 @@ function showBusTooltip(event, bus) {
         valueStr = `0x${val.toString(16).toUpperCase().padStart(8, '0')} (${toInt32(val)})`;
     }
     
+    const srcHtml = busValue.src ? `<div style="color: #64748b; margin-top: 4px; font-size: 12px;">src: <code>${busValue.src}</code></div>` : '';
+    const hintHtml = busValue.hint ? `<div style="color: #94a3b8; margin-top: 4px; font-size: 12px;">${busValue.hint}</div>` : '';
     tooltip.innerHTML = `
         <div style="font-weight: bold; color: #3b82f6; margin-bottom: 4px;">${busValue.label}</div>
         <div style="color: #22c55e;">${valueStr}</div>
+        ${srcHtml}
+        ${hintHtml}
     `;
     tooltip.style.display = 'block';
     moveBusTooltip(event);
@@ -201,9 +712,11 @@ function showBusTooltip(event, bus) {
 function moveBusTooltip(event) {
     const tooltip = document.getElementById('bus-tooltip');
     if (!tooltip || tooltip.style.display === 'none') return;
-    
-    tooltip.style.left = (event.pageX + 15) + 'px';
-    tooltip.style.top = (event.pageY + 15) + 'px';
+
+    const x = (event.pageX ?? (event.clientX + window.scrollX));
+    const y = (event.pageY ?? (event.clientY + window.scrollY));
+    tooltip.style.left = (x + 15) + 'px';
+    tooltip.style.top = (y + 15) + 'px';
 }
 
 function hideBusTooltip() {
@@ -312,11 +825,21 @@ function toggleSidebar() {
 ============================================================ */
 let isStepInProgress = false;
 
+// Controla el ritmo visual de las animaciones por etapa.
+// "Step" debe ser MUY lento para observar el flujo.
+let visualStageDelayMs = 400;
+
+function escapeSvgId(id) {
+    if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(id);
+    return String(id).replace(/[^a-zA-Z0-9_-]/g, (m) => `\\${m}`);
+}
+
 async function handleStep() {
     if (isStepInProgress) return;
     isStepInProgress = true;
 
-    const result = await cpu.stepWithStageDelay(updateStageIndicator, 400);
+    visualStageDelayMs = 1800;
+    const result = await cpu.stepWithStageDelay(updateStageIndicator, visualStageDelayMs);
     if (result) {
         // Almacenar resultado para tooltips
         lastStepResult = result;
@@ -356,9 +879,11 @@ async function handleRun(e) {
     async function runLoop() {
         while (isRunning && !cpu.state.halted) {
             const stageDelay = Math.min(executionDelay / 5, 300);
+            visualStageDelayMs = stageDelay;
             const result = await cpu.stepWithStageDelay(updateStageIndicator, stageDelay);
             if (result) {
                 lastStepResult = result;
+
                 updateUI(result);
             }
             await new Promise(resolve => setTimeout(resolve, executionDelay / 5));
@@ -477,7 +1002,7 @@ document.addEventListener('fullscreenchange', () => {
 /* ============================================================
    STAGE INDICATOR
 ============================================================ */
-function updateStageIndicator(stage) {
+function updateStageIndicator(stage, stageData = null) {
     // Actualizar pills
     document.querySelectorAll('.stage-pill').forEach(el => el.classList.remove('active'));
 
@@ -494,6 +1019,74 @@ function updateStageIndicator(stage) {
     
     // Iluminar componentes del datapath
     illuminateDatapathComponents(stage);
+
+    // Animación de “datos viajando” (sutil) en buses clave por etapa
+    animateStageDataFlow(stage, stageData);
+}
+
+function animateStageDataFlow(stage, stageData = null) {
+    const svg = dpAnim.svg;
+    if (!svg) return;
+
+    // Buses clave por etapa (IDs existentes en el SVG)
+    const stageBuses = {
+        [Stage.FETCH]: ['bus-pc-im', 'path58', 'path59'],
+        // Decode: índices rs1/rd + inmediato + señales de control
+        [Stage.DECODE]: [
+            'path50',
+            'path51',
+            'imm(11:15)',
+            'imm(4:0)',
+            'imm-rd',
+            'branch',
+            'br-neg',
+            'alu-src',
+            'alu-op',
+            'alu2reg',
+            'wem'
+        ],
+        // Exec: datos saliendo del banco de registros y entrando a la ALU
+        [Stage.EXEC]: ['path90', 'path89', 'path92', 'path81', 'path3', 'path78'],
+        [Stage.MEM]: ['path82', 'path84', 'path80'],
+        [Stage.WB]: ['alu-reg(0)', 'path91']
+    };
+
+    const ids = stageBuses[stage] || [];
+    ids.forEach((id, i) => {
+        const el = svg.querySelector('#' + escapeSvgId(id));
+        if (!el) return;
+
+        const durationMs = Math.max(350, Math.round(visualStageDelayMs * 0.8));
+        const staggerMs = Math.max(35, Math.round(visualStageDelayMs * 0.12));
+        const delayMs = i * staggerMs;
+
+        // Paquete visual recorriendo el cable durante la etapa
+        setTimeout(() => {
+            spawnPacketOnPath(el, { durationMs, radius: 3.0, soft: i > 1 });
+
+            // Etiqueta numérica (decimal) viajando por el mismo cable
+            const v = getBusValue(id, stageData)?.value;
+            if (v === null || v === undefined) return;
+
+            // Para cables de control: solo mostrar cuando la señal está activa (evita llenar de ceros)
+            const isControl = ['branch', 'br-neg', 'alu-src', 'alu2reg', 'wem', 'imm-rd'].includes(id);
+            const alwaysShow = ['alu-op'];
+            if (isControl && !alwaysShow.includes(id)) {
+                const n = Number(v);
+                if (Number.isFinite(n) && n === 0) return;
+            }
+
+            spawnValueTagOnPath(el, v, { durationMs, yOffset: -10 });
+        }, delayMs);
+    });
+
+    // Pings sutiles en eventos típicos
+    if (stage === Stage.WB) {
+        datapathPing('#mux-wb');
+    }
+    if (stage === Stage.MEM) {
+        datapathPing('#data-mem');
+    }
 }
 
 /* ============================================================
@@ -861,6 +1454,9 @@ function updateUI(stepResult) {
 
         highlightDecodeOnlyOnChange(d);
     }
+
+    // Si el visor está abierto, actualizarlo con el estado actual
+    refreshModuleVisor();
 }
 
 /* ============================================================

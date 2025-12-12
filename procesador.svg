@@ -680,123 +680,190 @@
     <style
    id="style1">
         /* ==== COMPONENTES PRINCIPALES ==== */
-        #pc, #pc rect, #pc path {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
-        }
+      #pc, #pc rect, #pc path {
+        fill: #0b1b2a !important;
+        stroke: #38bdf8 !important;
+        transition: all 0.3s ease;
+      }
         
         #pc.active, #pc.active rect, #pc.active path {
-            fill: #3b82f6;
-            stroke: #2563eb;
-            filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.8));
+          fill: #3b82f6 !important;
+          stroke: #2563eb !important;
+          filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.8));
         }
         
-        #control-unit {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
+        #control-unit, #control-unit rect, #control-unit path {
+          fill: #221708 !important;
+          stroke: #fbbf24 !important;
+          transition: all 0.3s ease;
         }
         
-        #control-unit.active {
-            fill: #f59e0b;
-            stroke: #d97706;
-            filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8));
+        #control-unit.active, #control-unit.active rect, #control-unit.active path {
+          fill: #f59e0b !important;
+          stroke: #d97706 !important;
+          filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8));
         }
         
-        #instr-mem {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
+        #instr-mem, #instr-mem rect, #instr-mem path {
+          fill: #081f14 !important;
+          stroke: #34d399 !important;
+          transition: all 0.3s ease;
         }
         
-        #instr-mem.active {
-            fill: #22c55e;
-            stroke: #16a34a;
-            filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.8));
+        #instr-mem.active, #instr-mem.active rect, #instr-mem.active path {
+          fill: #22c55e !important;
+          stroke: #16a34a !important;
+          filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.8));
         }
         
         #registers, #registers rect, #registers path {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
+          fill: #241b0a !important;
+          stroke: #fb923c !important;
+          transition: all 0.3s ease;
         }
         
         #registers.active, #registers.active rect, #registers.active path {
-            fill: #f59e0b;
-            stroke: #d97706;
-            filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8));
+          fill: #f59e0b !important;
+          stroke: #d97706 !important;
+          filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8));
         }
         
         #data-mem, #data-mem rect, #data-mem path {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
+          fill: #1a1030 !important;
+          stroke: #a78bfa !important;
+          transition: all 0.3s ease;
         }
         
         #data-mem.active, #data-mem.active rect, #data-mem.active path {
-            fill: #8b5cf6;
-            stroke: #7c3aed;
-            filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.8));
+          fill: #8b5cf6 !important;
+          stroke: #7c3aed !important;
+          filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.8));
         }
         
-        #alu {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
+        #alu, #alu rect, #alu path {
+          fill: #2a0f14 !important;
+          stroke: #fb7185 !important;
+          transition: all 0.3s ease;
         }
         
-        #alu.active {
-            fill: #ef4444;
-            stroke: #dc2626;
-            filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8));
+        #alu.active, #alu.active rect, #alu.active path {
+          fill: #ef4444 !important;
+          stroke: #dc2626 !important;
+          filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8));
         }
         
-        #sign-extend {
-            fill: #1e293b;
-            stroke: #64748b;
-            transition: all 0.3s ease;
+        #sign-extend, #sign-extend rect, #sign-extend path {
+          fill: #072128 !important;
+          stroke: #22d3ee !important;
+          transition: all 0.3s ease;
         }
         
-        #sign-extend.active {
-            fill: #06b6d4;
-            stroke: #0891b2;
-            filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.8));
+        #sign-extend.active, #sign-extend.active rect, #sign-extend.active path {
+          fill: #06b6d4 !important;
+          stroke: #0891b2 !important;
+          filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.8));
         }
         
         /* ==== MULTIPLEXORES Y OTROS ==== */
-        #mux-wb, #mux-alu-a, #pc-adder, 
+        #mux-wb, #mux-alu-a,
         #path8, #path12, #path13, #path14, #path35, #not {
-            fill: #0f172a;
-            stroke: #64748b;
+          fill: #081a1a;
+          stroke: #2dd4bf;
             transition: all 0.3s ease;
         }
+
+        /* PC+4 (adder) separado para que siempre tome color aunque tenga fills inline */
+        #pc-adder, #pc-adder rect, #pc-adder path, #pc-adder polygon {
+          fill: #061c1c !important;
+          stroke: #2dd4bf !important;
+          transition: all 0.3s ease;
+        }
         
-        #mux-wb.active, #mux-alu-a.active, #pc-adder.active,
+        #mux-wb.active, #mux-alu-a.active,
         #path8.active, #path12.active, #path13.active,
         #path14.active, #path35.active, #not.active {
             fill: #22c55e;
             stroke: #16a34a;
             filter: drop-shadow(0 0 10px rgba(34, 197, 94, 0.7));
         }
+
+        #pc-adder.active, #pc-adder.active rect, #pc-adder.active path, #pc-adder.active polygon {
+          fill: #10b981 !important;
+          stroke: #059669 !important;
+          filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.7));
+        }
         
         /* ==== LÍNEAS/BUSES ==== */
         path[id^=&quot;path&quot;], path[id^=&quot;bus&quot;], path[id^=&quot;imm&quot;], 
         path[id^=&quot;branch&quot;], path[id^=&quot;alu&quot;], path[id^=&quot;wer&quot;], 
         path[id^=&quot;wem&quot;], path[id^=&quot;br-neg&quot;] {
-            stroke: #64748b;
+          /* Default más limpio; se sobre-escribe por categorías */
+          stroke: #94a3b8 !important;
             stroke-width: 2.5;
+          stroke-opacity: 0.65;
             fill: none;
             transition: all 0.3s ease;
+        }
+
+        /* --- CATEGORÍAS DE CABLES (por conexión) --- */
+        /* PC / Fetch */
+        #bus-pc-im, #bus-pc-inc, #path57, #path58, #path59 {
+          stroke: #38bdf8 !important;
+          stroke-opacity: 0.85;
+        }
+
+        /* Decode: índices rs1/rs2 / señales hacia regfile */
+        #path50, #path51 {
+          stroke: #fb923c !important;
+          stroke-opacity: 0.85;
+        }
+
+        /* Inmediatos */
+        #imm\(11\:15\), #imm\(4\:0\), #imm-rd {
+          stroke: #22d3ee !important;
+          stroke-opacity: 0.9;
+        }
+
+        /* Datos desde registros hacia ALU */
+        #path89, #path90, #path92, #path81, #path3 {
+          stroke: #f59e0b !important;
+          stroke-opacity: 0.9;
+        }
+
+        /* Resultado ALU */
+        #path78, #alu-reg\(0\) {
+          stroke: #fb7185 !important;
+          stroke-opacity: 0.95;
+        }
+
+        /* Memoria de datos: address/write/read */
+        #path82, #path84, #path80, #path86 {
+          stroke: #a78bfa !important;
+          stroke-opacity: 0.9;
+        }
+
+        /* Write-back a registros */
+        #path91 {
+          stroke: #60a5fa !important;
+          stroke-opacity: 0.9;
+        }
+
+        /* Señales de control */
+        #alu-op, #alu-src, #wem, #wer, #alu2reg, #branch, #br-neg {
+          stroke: #f472b6 !important;
+          stroke-opacity: 0.9;
         }
         
         path.active, path[id^=&quot;path&quot;].active, path[id^=&quot;bus&quot;].active, 
         path[id^=&quot;imm&quot;].active, path[id^=&quot;branch&quot;].active, 
         path[id^=&quot;alu&quot;].active, path[id^=&quot;wer&quot;].active, 
         path[id^=&quot;wem&quot;].active, path[id^=&quot;br-neg&quot;].active {
-            stroke: #3b82f6;
             stroke-width: 3.5;
-            filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.9));
+          stroke-opacity: 1;
+          /* Glow neutro para respetar el color individual del cable */
+          filter:
+            drop-shadow(0 0 10px rgba(255, 255, 255, 0.14))
+            drop-shadow(0 0 18px rgba(59, 130, 246, 0.18));
             animation: flow 1.5s ease-in-out infinite;
         }
         

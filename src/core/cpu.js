@@ -303,13 +303,22 @@ export class RISCVProcessor {
     step(onStageUpdate) {
         if (this.state.halted) return null;
 
+        const pc_before = this.state.pc >>> 0;
+
         // FETCH
         if (onStageUpdate) onStageUpdate(Stage.FETCH);
-        const index = (this.state.pc >>> 2) & 0xff;
-        const instr = this.state.instrMem[index] >>> 0;
+        const wordIndex = this.state.pc >>> 2;
+        if (wordIndex >= this.state.instrMem.length) {
+            this.state.halted = true;
+            return null;
+        }
 
-        // Detectar fin del programa: instrucción nula o PC fuera de rango
-        if (instr === 0 || index >= 256) {
+        const instr = this.state.instrMem[wordIndex] >>> 0;
+
+        // Detectar fin del programa: instrucción nula o HALT explícito
+        // - instr == 0: memoria limpia después del último word
+        // - ECALL / EBREAK
+        if (instr === 0 || instr === 0x00000073 || instr === 0x00100073) {
             this.state.halted = true;
             return null;
         }
@@ -325,6 +334,8 @@ export class RISCVProcessor {
         // READ REGISTERS
         const a = this.state.regs[rs1] | 0;
         let breg = this.state.regs[rs2] | 0;
+        const rs1_val = a >>> 0;
+        const rs2_val = (breg | 0) >>> 0;
 
         // EXEC
         if (onStageUpdate) onStageUpdate(Stage.EXEC);
@@ -334,11 +345,17 @@ export class RISCVProcessor {
         // MEM
         if (onStageUpdate) onStageUpdate(Stage.MEM);
         let memData = 0;
+        let mem_addr = null;
+        let mem_index = null;
         if (ctrl.wem) {
             const addrIndex = (alu_res >>> 2) & 0x1f;
+            mem_addr = alu_res >>> 0;
+            mem_index = addrIndex;
             this.state.dataMem[addrIndex] = breg >>> 0;
         } else if (decoded.opcode === 0x03) {
             const addrIndex = (alu_res >>> 2) & 0x1f;
+            mem_addr = alu_res >>> 0;
+            mem_index = addrIndex;
             memData = this.state.dataMem[addrIndex] >>> 0;
         }
 
@@ -355,19 +372,36 @@ export class RISCVProcessor {
 
         // WB
         if (onStageUpdate) onStageUpdate(Stage.WB);
+        let wb_we = false;
+        let wb_rd = null;
+        let wb_val = null;
         if (!ctrl.wem && decoded.opcode !== 0x63 && rd !== 0) {
             const value = decoded.opcode === 0x03 && ctrl.alu2reg ? memData : alu_res;
             this.state.regs[rd] = value >>> 0;
+            wb_we = true;
+            wb_rd = rd;
+            wb_val = value >>> 0;
         }
 
         this.state.pc = pc_next >>> 0;
+        const pc_after = this.state.pc >>> 0;
 
         return {
             instr,
+            pc_before,
+            pc_after,
             decoded,
             ctrl,
+            rs1_val,
+            rs2_val,
             alu_res,
-            alu_b
+            alu_b,
+            mem_data: memData >>> 0,
+            mem_addr,
+            mem_index,
+            wb_we,
+            wb_rd,
+            wb_val
         };
     }
 
@@ -375,42 +409,95 @@ export class RISCVProcessor {
     async stepWithStageDelay(onStageUpdate, stageDelay = 400) {
         if (this.state.halted) return null;
 
+        const pc_before = this.state.pc >>> 0;
+
+        // Snapshot incremental para UI (tooltips/animaciones por etapa)
+        const snap = {
+            instr: null,
+            pc_before,
+            pc_after: null,
+            decoded: null,
+            ctrl: null,
+            rs1_val: null,
+            rs2_val: null,
+            alu_res: null,
+            alu_b: null,
+            mem_data: 0 >>> 0,
+            mem_addr: null,
+            mem_index: null,
+            wb_we: false,
+            wb_rd: null,
+            wb_val: null,
+        };
+
+        const wordIndex = this.state.pc >>> 2;
+        if (wordIndex >= this.state.instrMem.length) {
+            this.state.halted = true;
+            return null;
+        }
+
+        const instr = this.state.instrMem[wordIndex] >>> 0;
+
+        // FETCH (datos listos para mostrar/animar)
+        snap.instr = instr;
+        if (onStageUpdate) onStageUpdate(Stage.FETCH, { ...snap });
+        await this._delay(stageDelay);
+
+        // Detectar fin del programa: instrucción nula o HALT explícito
+        if (instr === 0 || instr === 0x00000073 || instr === 0x00100073) {
+            this.state.halted = true;
+            return null;
+        }
+
         this.state.cycle++;
 
-        // FETCH
-        if (onStageUpdate) onStageUpdate(Stage.FETCH);
-        await this._delay(stageDelay);
-        const index = (this.state.pc >>> 2) & 0xff;
-        const instr = this.state.instrMem[index] >>> 0;
-
-        // DECODE
-        if (onStageUpdate) onStageUpdate(Stage.DECODE);
-        await this._delay(stageDelay);
+        // DECODE / READ REGISTERS
         const decoded = this.decode(instr);
         const ctrl = controlUnit(decoded);
         const { rs1, rs2, rd, imm } = decoded;
 
-        // READ REGISTERS
         const a = this.state.regs[rs1] | 0;
         let breg = this.state.regs[rs2] | 0;
+        const rs1_val = a >>> 0;
+        const rs2_val = (breg | 0) >>> 0;
+
+        snap.decoded = decoded;
+        snap.ctrl = ctrl;
+        snap.rs1_val = rs1_val;
+        snap.rs2_val = rs2_val;
+        if (onStageUpdate) onStageUpdate(Stage.DECODE, { ...snap });
+        await this._delay(stageDelay);
 
         // EXEC
-        if (onStageUpdate) onStageUpdate(Stage.EXEC);
-        await this._delay(stageDelay);
         const alu_b = ctrl.alu_src ? imm : breg;
         const alu_res = alu(a, alu_b, ctrl.alu_op);
 
-        // MEM
-        if (onStageUpdate) onStageUpdate(Stage.MEM);
+        snap.alu_b = alu_b >>> 0;
+        snap.alu_res = alu_res >>> 0;
+        if (onStageUpdate) onStageUpdate(Stage.EXEC, { ...snap });
         await this._delay(stageDelay);
+
+        // MEM
         let memData = 0;
+        let mem_addr = null;
+        let mem_index = null;
         if (ctrl.wem) {
             const addrIndex = (alu_res >>> 2) & 0x1f;
+            mem_addr = alu_res >>> 0;
+            mem_index = addrIndex;
             this.state.dataMem[addrIndex] = breg >>> 0;
         } else if (decoded.opcode === 0x03) {
             const addrIndex = (alu_res >>> 2) & 0x1f;
+            mem_addr = alu_res >>> 0;
+            mem_index = addrIndex;
             memData = this.state.dataMem[addrIndex] >>> 0;
         }
+
+        snap.mem_data = memData >>> 0;
+        snap.mem_addr = mem_addr;
+        snap.mem_index = mem_index;
+        if (onStageUpdate) onStageUpdate(Stage.MEM, { ...snap });
+        await this._delay(stageDelay);
 
         // BRANCH
         let pc_next = (this.state.pc + 4) | 0;
@@ -424,21 +511,44 @@ export class RISCVProcessor {
         }
 
         // WB
-        if (onStageUpdate) onStageUpdate(Stage.WB);
-        await this._delay(stageDelay);
+        let wb_we = false;
+        let wb_rd = null;
+        let wb_val = null;
         if (!ctrl.wem && decoded.opcode !== 0x63 && rd !== 0) {
             const value = decoded.opcode === 0x03 && ctrl.alu2reg ? memData : alu_res;
             this.state.regs[rd] = value >>> 0;
+            wb_we = true;
+            wb_rd = rd;
+            wb_val = value >>> 0;
         }
 
+        snap.wb_we = wb_we;
+        snap.wb_rd = wb_rd;
+        snap.wb_val = wb_val;
+        if (onStageUpdate) onStageUpdate(Stage.WB, { ...snap });
+        await this._delay(stageDelay);
+
         this.state.pc = pc_next >>> 0;
+        const pc_after = this.state.pc >>> 0;
+
+        snap.pc_after = pc_after;
 
         return {
             instr,
+            pc_before,
+            pc_after,
             decoded,
             ctrl,
+            rs1_val,
+            rs2_val,
             alu_res,
-            alu_b
+            alu_b,
+            mem_data: memData >>> 0,
+            mem_addr,
+            mem_index,
+            wb_we,
+            wb_rd,
+            wb_val
         };
     }
 
