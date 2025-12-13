@@ -94,5 +94,15 @@
       <line x1="12" y1="8" x2="12.01" y2="8"/>
     </svg>
   </button>
+
+  <script>
+    (function () {
+      const btn = document.getElementById('info-button');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        window.location.href = 'contact.html';
+      });
+    })();
+  </script>
 </body>
 </html>

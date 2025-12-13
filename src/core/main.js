@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLoad = document.getElementById('btn-load');
     const btnFullscreen = document.getElementById('btn-fullscreen');
     const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    const btnInfo = document.getElementById('btn-info');
     const btnCollapseSidebar = document.getElementById('btn-collapse-sidebar');
     const btnPreloadCollatz = document.getElementById('btn-preload-collatz');
     const btnPreloadFibonacci = document.getElementById('btn-preload-fibonacci');
@@ -124,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnLoad) btnLoad.addEventListener('click', handleLoad);
     if (btnFullscreen) btnFullscreen.addEventListener('click', handleFullscreen);
     if (btnToggleSidebar) btnToggleSidebar.addEventListener('click', toggleSidebar);
+    if (btnInfo) btnInfo.addEventListener('click', () => { window.location.href = 'contact.html'; });
     if (btnCollapseSidebar) btnCollapseSidebar.addEventListener('click', toggleSidebar);
     if (btnPreloadCollatz) btnPreloadCollatz.addEventListener('click', () => loadPresetProgram('collatz'));
     if (btnPreloadFibonacci) btnPreloadFibonacci.addEventListener('click', () => loadPresetProgram('fibonacci'));
