@@ -1452,6 +1452,10 @@ z-index: 2;
     transition: var(--transition-normal);
 }
 
+.toast svg {
+    stroke: currentColor;
+}
+
 .toast.show {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
@@ -1460,6 +1464,16 @@ z-index: 2;
 .toast.success {
     border-color: var(--success-color);
     box-shadow: 0 0 20px var(--success-glow);
+}
+
+.toast.error {
+    border: 1px solid #e74c3c;
+    color: #e74c3c; /* X roja */
+}
+
+.toast.info {
+    border: 1px solid #3498db;
+    color: #3498db; /* info azul */
 }
 
 /* ============================================================
@@ -1854,3 +1868,5 @@ z-index: 2;
     filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.8)) !important;
     transition: all 0.15s ease;
 }
+
+
