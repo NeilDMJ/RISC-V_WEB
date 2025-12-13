@@ -1098,18 +1098,57 @@ function handleLoad() {
 
     let program;
 
-    if (/^[0-9a-fA-F]+$/.test(code.split("\n")[0].trim())) {
-        program = code;
-    } else {
-        const hexArray = assembleProgram(code);
-        program = hexArray.map(x => x.toString(16).padStart(8, "0")).join("\n");
-    }
+    try {
+        // Si ya viene en hexadecimal
+        if (/^[0-9a-fA-F]+$/.test(code.split("\n")[0].trim())) {
+            program = code;
+        } else {
+            // AQUÍ puede lanzar errores el ensamblador
+            const hexArray = assembleProgram(code);
+            program = hexArray
+                .map(x => x.toString(16).padStart(8, "0"))
+                .join("\n");
+        }
 
-    lastDecoded = null;
-    cpu.loadProgram(program);
-    updateUI();
-    showToast("Programa cargado exitosamente", "success");
+        lastDecoded = null;
+        cpu.loadProgram(program);
+        updateUI();
+
+        showToast("Programa cargado exitosamente", "success");
+
+    } catch (err) {
+        // 👇 AQUÍ atrapamos el error del ensamblador
+        console.error(err);
+        showToast(err.message, "error");
+    }
 }
+
+const toastSVG = {
+    success: `
+        <svg width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+    `,
+    error: `
+        <svg width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+    `,
+    info: `
+        <svg width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+    `
+};
+
 
 /* ============================================================
    TOAST NOTIFICATIONS
@@ -1121,11 +1160,9 @@ function showToast(message, type = "info") {
     
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--success-color)">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
+    
+       toast.innerHTML = `
+        ${toastSVG[type] || toastSVG.info}
         <span>${message}</span>
     `;
     document.body.appendChild(toast);
@@ -1981,3 +2018,5 @@ function updateMemoryStats(lastAddr, operation = 'READ') {
         document.getElementById('memory-last-op').textContent = operation;
     }
 }
+
+
