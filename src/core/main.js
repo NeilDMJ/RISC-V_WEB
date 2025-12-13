@@ -1,7 +1,6 @@
 
 import { RISCVProcessor, Stage } from './cpu.js';
-import { toHex32, toInt32 } from './utils.js';
-import { assembleProgram } from './utils.js';
+import { toHex32, toInt32, signExtend, assembleProgram } from './utils.js';
 
 let lastDecoded = null;
 let currentDecoded = null; // Para actualizar cuando cambia el formato
@@ -1589,12 +1588,165 @@ function getBinaryRepresentation(decoded) {
     return `${funct7Bin} ${rs2Bin} ${rs1Bin} ${funct3Bin} ${rdBin} ${opcodeBin}`;
 }
 
+function disassembleRV32I(instr, pc = 0) {
+    if (instr == null) return '--';
+    const word = instr >>> 0;
+
+    // Detectar fin del programa (coincidir con la lógica de HALT del CPU)
+    if (word === 0) return 'halt';
+    if (word === 0x00000073) return 'ecall';
+    if (word === 0x00100073) return 'ebreak';
+
+    const opcode = word & 0x7f;
+    const rd = (word >>> 7) & 0x1f;
+    const funct3 = (word >>> 12) & 0x7;
+    const rs1 = (word >>> 15) & 0x1f;
+    const rs2 = (word >>> 20) & 0x1f;
+    const funct7 = (word >>> 25) & 0x7f;
+
+    const x = (n) => `x${n}`;
+    const hex = () => toHex32(word);
+
+    // Helpers de inmediatos
+    const immI = () => signExtend(word >>> 20, 12) | 0;
+    const immS = () => {
+        const imm4_0 = (word >>> 7) & 0x1f;
+        const imm11_5 = (word >>> 25) & 0x7f;
+        return (signExtend((imm11_5 << 5) | imm4_0, 12) | 0);
+    };
+    const immB = () => {
+        const imm12 = (word >>> 31) & 0x1;
+        const imm10_5 = (word >>> 25) & 0x3f;
+        const imm4_1 = (word >>> 8) & 0x0f;
+        const imm11 = (word >>> 7) & 0x1;
+        const raw = (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1);
+        return (signExtend(raw, 13) | 0);
+    };
+    const immU = () => (word & 0xfffff000) >>> 0;
+    const immJ = () => {
+        const imm20 = (word >>> 31) & 0x1;
+        const imm10_1 = (word >>> 21) & 0x3ff;
+        const imm11 = (word >>> 20) & 0x1;
+        const imm19_12 = (word >>> 12) & 0xff;
+        const raw = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
+        return (signExtend(raw, 21) | 0);
+    };
+
+    // ------------ R-TYPE ------------
+    if (opcode === 0x33) {
+        let mn = null;
+        if (funct3 === 0x0 && funct7 === 0x00) mn = 'add';
+        else if (funct3 === 0x0 && funct7 === 0x20) mn = 'sub';
+        else if (funct3 === 0x7 && funct7 === 0x00) mn = 'and';
+        else if (funct3 === 0x6 && funct7 === 0x00) mn = 'or';
+        else if (funct3 === 0x4 && funct7 === 0x00) mn = 'xor';
+        else if (funct3 === 0x1 && funct7 === 0x00) mn = 'sll';
+        else if (funct3 === 0x5 && funct7 === 0x00) mn = 'srl';
+        else if (funct3 === 0x5 && funct7 === 0x20) mn = 'sra';
+        if (!mn) return hex();
+        return `${mn} ${x(rd)}, ${x(rs1)}, ${x(rs2)}`;
+    }
+
+    // ------------ I-TYPE ARITH ------------
+    if (opcode === 0x13) {
+        const imm = immI();
+        let mn = null;
+        if (funct3 === 0x0) mn = 'addi';
+        else if (funct3 === 0x7) mn = 'andi';
+        else if (funct3 === 0x6) mn = 'ori';
+        else if (funct3 === 0x4) mn = 'xori';
+        else if (funct3 === 0x2) mn = 'slti';
+        else if (funct3 === 0x1) {
+            const shamt = (word >>> 20) & 0x1f;
+            mn = 'slli';
+            return `${mn} ${x(rd)}, ${x(rs1)}, ${shamt}`;
+        } else if (funct3 === 0x5) {
+            const shamt = (word >>> 20) & 0x1f;
+            mn = (funct7 === 0x20) ? 'srai' : 'srli';
+            return `${mn} ${x(rd)}, ${x(rs1)}, ${shamt}`;
+        }
+        if (!mn) return hex();
+        return `${mn} ${x(rd)}, ${x(rs1)}, ${imm}`;
+    }
+
+    // ------------ LOAD ------------
+    if (opcode === 0x03) {
+        const imm = immI();
+        if (funct3 === 0x2) return `lw ${x(rd)}, ${imm}(${x(rs1)})`;
+        return hex();
+    }
+
+    // ------------ STORE ------------
+    if (opcode === 0x23) {
+        const imm = immS();
+        if (funct3 === 0x2) return `sw ${x(rs2)}, ${imm}(${x(rs1)})`;
+        return hex();
+    }
+
+    // ------------ BRANCH ------------
+    if (opcode === 0x63) {
+        const imm = immB();
+        let mn = null;
+        if (funct3 === 0x0) mn = 'beq';
+        else if (funct3 === 0x1) mn = 'bne';
+        else if (funct3 === 0x4) mn = 'blt';
+        else if (funct3 === 0x5) mn = 'bge';
+        else if (funct3 === 0x6) mn = 'bltu';
+        else if (funct3 === 0x7) mn = 'bgeu';
+        if (!mn) return hex();
+        // Mostrar offset (inmediato) y destino en hex (útil para debug)
+        const target = ((pc >>> 0) + (imm | 0)) >>> 0;
+        return `${mn} ${x(rs1)}, ${x(rs2)}, ${imm} (${toHex32(target)})`;
+    }
+
+    // ------------ LUI ------------
+    if (opcode === 0x37) {
+        const imm = immU();
+        return `lui ${x(rd)}, ${toHex32(imm)}`;
+    }
+
+    // ------------ JAL ------------
+    if (opcode === 0x6f) {
+        const imm = immJ();
+        const target = ((pc >>> 0) + (imm | 0)) >>> 0;
+        return `jal ${x(rd)}, ${imm} (${toHex32(target)})`;
+    }
+
+    // ------------ SYSTEM ------------
+    if (opcode === 0x73) {
+        return hex();
+    }
+
+    return hex();
+}
+
 /* ============================================================
    UI UPDATES
 ============================================================ */
 function updateUI(stepResult) {
     document.getElementById('ui-pc').textContent = toHex32(cpu.state.pc);
     document.getElementById('ui-cycle').textContent = cpu.state.cycle;
+
+    // Header: siempre intentar mostrar la instrucción actual
+    const asmEl = document.getElementById('ui-asm');
+    if (asmEl) {
+        const instrFromStep = (typeof stepResult?.instr === 'number') ? (stepResult.instr >>> 0) : null;
+        let instr = instrFromStep;
+        if (instr == null) {
+            const wi = (cpu.state.pc >>> 2);
+            instr = (wi >= 0 && wi < cpu.state.instrMem.length) ? (cpu.state.instrMem[wi] >>> 0) : null;
+        }
+
+        const pcForDisasm = (typeof stepResult?.pc_before === 'number') ? (stepResult.pc_before >>> 0) : (cpu.state.pc >>> 0);
+
+        if (typeof stepResult?.asm === 'string' && stepResult.asm.trim()) {
+            asmEl.textContent = stepResult.asm;
+        } else if (instr == null) {
+            asmEl.textContent = '--';
+        } else {
+            asmEl.textContent = disassembleRV32I(instr, pcForDisasm);
+        }
+    }
 
     renderRegisters();
     renderMemory();
@@ -1609,12 +1761,6 @@ function updateUI(stepResult) {
         // Detalles adicionales - binario siempre igual
         document.getElementById('info-binary').textContent = getBinaryRepresentation(d);
         
-        // Actualizar ASM en header si existe la función
-        const asmEl = document.getElementById('ui-asm');
-        if (asmEl && stepResult.asm) {
-            asmEl.textContent = stepResult.asm;
-        }
-
         highlightDecodeOnlyOnChange(d);
     }
 
